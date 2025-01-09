@@ -4,12 +4,18 @@ import java.util.*
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
  **/
-fun main(args: Array<String>) {
+fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
     val input = Scanner(System.`in`)
+
+    @Suppress("UNUSED_VARIABLE")
     val nbFloors = input.nextInt() // number of floors in the area. A clone can move between floor 0 and floor nbFloors - 1
+
     val width = input.nextInt() // the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+
+    @Suppress("UNUSED_VARIABLE")
     val nbRounds = input.nextInt() // maximum number of rounds before the end of the game
+
     val exitFloor = input.nextInt() // the floor on which the exit is located
     val exitPos = input.nextInt() // the position of the exit on its floor
     val nbTotalClones = input.nextInt() // the number of clones that will come out of the generator during the game
@@ -79,7 +85,7 @@ fun main(args: Array<String>) {
         }
 
         fun optimizeCases() {
-            TODO("оптимизировать кейсы - убрать менее быстрые при текущих или более жёстких ограничениях")
+            //TODO("оптимизировать кейсы - убрать менее быстрые при текущих или более жёстких ограничениях")
             // более жёсткие ограничения - по всем признакам, не по какому-то одному
         }
 
@@ -364,18 +370,18 @@ fun main(args: Array<String>) {
     val area = buildArea()
 
     var clonesLeft = nbTotalClones
-    var elevatorsLeft = nbElevators
+    var elevatorsLeft = nbAdditionalElevators
 
-    fun wait() {
+    fun doNothingAndWait() {
         println("WAIT")
     }
 
-    fun block() {
+    fun blockClone() {
         println("BLOCK")
         clonesLeft--
     }
 
-    fun elevator() {
+    fun buildElevator() {
         println("ELEVATOR")
         clonesLeft--
         elevatorsLeft--
@@ -385,24 +391,19 @@ fun main(args: Array<String>) {
     while (true) {
         val cloneFloor = input.nextInt() // floor of the leading clone
         val clonePos = input.nextInt() // position of the leading clone on its floor
-
         // direction of the leading clone: LEFT or RIGHT
-        val direction = input.next().let {
-            if (it == "LEFT") Direction.LEFT else Direction.RIGHT
-        }
+        val direction = input.next().let { Direction.valueOf(it) }
 
         fun noClone() = cloneFloor < 0
 
         if (noClone()) {
-            wait()
+            doNothingAndWait()
         }
-
-        TODO("Есть ещё кейсы - бежать к краям и где-то по пути строить лифты")
 
         fun suits(
             case: Case,
         ): Boolean {
-            TODO()
+            return case.clonesLeft <= clonesLeft && case.elevatorsLeft <= elevatorsLeft
         }
 
         val bestCase = area
@@ -415,10 +416,21 @@ fun main(args: Array<String>) {
                 it.distance
             }
 
+        if (haveToBuildElevator) {
+            buildElevator()
+        } else {
+            if (bestCase.direction == direction) {
+                doNothingAndWait()
+            } else {
+                blockClone()
+            }
+        }
 
+        TODO("Есть ещё кейсы - бежать к краям и где-то по пути строить лифты")
     }
 }
 
+@Suppress("unused")
 private fun debug(message: String) = System.err.println(message)
 
 /**
