@@ -9,9 +9,11 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
     val input = Scanner(System.`in`)
 
     @Suppress("UNUSED_VARIABLE")
-    val nbFloors = input.nextInt() // number of floors in the area. A clone can move between floor 0 and floor nbFloors - 1
+    val nbFloors =
+        input.nextInt() // number of floors in the area. A clone can move between floor 0 and floor nbFloors - 1
 
-    val width = input.nextInt() // the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+    val width =
+        input.nextInt() // the width of the area. The clone can move without being destroyed between position 0 and position width - 1
 
     @Suppress("UNUSED_VARIABLE")
     val nbRounds = input.nextInt() // maximum number of rounds before the end of the game
@@ -113,12 +115,14 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                         Case(
                             direction = Direction.LEFT,
                             distance = 0,
+                            haveToBuildElevator = false,
                             elevatorsLeft = 0,
                             clonesLeft = 1, // текущий - кто будет спасён
                         ),
                         Case(
                             direction = Direction.RIGHT,
                             distance = 0,
+                            haveToBuildElevator = false,
                             elevatorsLeft = 0,
                             clonesLeft = 1, // текущий - кто будет спасён
                         ),
@@ -137,6 +141,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 Case(
                                     direction = Direction.LEFT,
                                     distance = exitPos - position + 1,
+                                    haveToBuildElevator = false,
                                     elevatorsLeft = 0,
                                     clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
                                 ),
@@ -145,6 +150,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 Case(
                                     direction = Direction.RIGHT,
                                     distance = exitPos - position,
+                                    haveToBuildElevator = false,
                                     elevatorsLeft = 0,
                                     clonesLeft = 1, // текущий - кто будет спасён
                                 ),
@@ -164,6 +170,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 Case(
                                     direction = Direction.RIGHT,
                                     distance = position - exitPos + 1,
+                                    haveToBuildElevator = false,
                                     elevatorsLeft = 0,
                                     clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
                                 ),
@@ -172,6 +179,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 Case(
                                     direction = Direction.LEFT,
                                     distance = position - exitPos,
+                                    haveToBuildElevator = false,
                                     elevatorsLeft = 0,
                                     clonesLeft = 1, // текущий - кто будет спасён
                                 ),
@@ -224,6 +232,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                         .map {
                                             it.copy(
                                                 distance = it.distance + 1,
+                                                haveToBuildElevator = true,
                                                 elevatorsLeft = it.elevatorsLeft + 1,
                                                 clonesLeft = it.clonesLeft + 1,
                                             )
@@ -398,33 +407,46 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
         if (noClone()) {
             doNothingAndWait()
+            continue
         }
 
-        fun suits(
-            case: Case,
-        ): Boolean {
-            return case.clonesLeft <= clonesLeft && case.elevatorsLeft <= elevatorsLeft
+        val isElevator = elevators
+            .isElevator(
+                floorIndex = cloneFloor,
+                position = clonePos,
+            )
+
+        if (isElevator) {
+            doNothingAndWait()
+            continue
+        }
+
+        fun Case.satisfiesConstraints(): Boolean {
+            return this.clonesLeft <= clonesLeft && this.elevatorsLeft <= elevatorsLeft
         }
 
         val bestCase = area
             .floors[cloneFloor]
             .cases[clonePos]
             .filter {
-                suits(it)
+                it.satisfiesConstraints()
             }
             .minBy {
                 it.distance
             }
 
-        if (haveToBuildElevator) {
+        if (bestCase.haveToBuildElevator) {
             buildElevator()
-        } else {
-            if (bestCase.direction == direction) {
-                doNothingAndWait()
-            } else {
-                blockClone()
-            }
+            continue
         }
+
+        if (bestCase.direction != direction) {
+            blockClone()
+            continue
+        }
+
+        // клон двигается, как надо
+        doNothingAndWait()
 
         TODO("Есть ещё кейсы - бежать к краям и где-то по пути строить лифты")
     }
@@ -461,4 +483,8 @@ private data class Case(
      * Сколько клонов должно быть в запасе для достижения выхода
      */
     val clonesLeft: Int,
+    /**
+     * Предполагает обязательную постройку лифта
+     */
+    val haveToBuildElevator: Boolean,
 )
