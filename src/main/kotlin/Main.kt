@@ -7,14 +7,14 @@ import java.util.*
 fun main(args: Array<String>) {
 
     val input = Scanner(System.`in`)
-    val nbFloors = input.nextInt() // number of floors
-    val width = input.nextInt() // width of the area
-    val nbRounds = input.nextInt() // maximum number of rounds
-    val exitFloor = input.nextInt() // floor on which the exit is found
-    val exitPos = input.nextInt() // position of the exit on its floor
-    val nbTotalClones = input.nextInt() // number of generated clones
+    val nbFloors = input.nextInt() // number of floors in the area. A clone can move between floor 0 and floor nbFloors - 1
+    val width = input.nextInt() // the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+    val nbRounds = input.nextInt() // maximum number of rounds before the end of the game
+    val exitFloor = input.nextInt() // the floor on which the exit is located
+    val exitPos = input.nextInt() // the position of the exit on its floor
+    val nbTotalClones = input.nextInt() // the number of clones that will come out of the generator during the game
     val nbAdditionalElevators = input.nextInt() // number of additional elevators that you can build
-    val nbElevators = input.nextInt() // number of elevators
+    val nbElevators = input.nextInt() // number of elevators in the area
 
     /**
      * Количество этажей, с которыми имеет смысл работать.
@@ -91,23 +91,31 @@ fun main(args: Array<String>) {
         }
     }
 
-    class Drive(
+    class Area(
         val floors: List<Floor>,
-    ) {
-
-    }
+    )
 
     /**
      * Варианты движения для каждого этажа и каждой ячейки на этаже
      */
-    fun buildDrive(): Drive {
+    fun buildArea(): Area {
         fun buildExitFloor(): Floor {
             return Floor(floorIndex = exitFloor)
                 .apply {
                     addCases(
                         position = exitPos,
-                        Case(direction = Direction.LEFT, distance = 0, elevatorsReserved = 0, clonesReserved = 0),
-                        Case(direction = Direction.RIGHT, distance = 0, elevatorsReserved = 0, clonesReserved = 0),
+                        Case(
+                            direction = Direction.LEFT,
+                            distance = 0,
+                            elevatorsLeft = 0,
+                            clonesLeft = 1, // текущий - кто будет спасён
+                        ),
+                        Case(
+                            direction = Direction.RIGHT,
+                            distance = 0,
+                            elevatorsLeft = 0,
+                            clonesLeft = 1, // текущий - кто будет спасён
+                        ),
                     )
 
                     (exitPos - 1 downTo 0)
@@ -123,16 +131,16 @@ fun main(args: Array<String>) {
                                 Case(
                                     direction = Direction.LEFT,
                                     distance = exitPos - position + 1,
-                                    elevatorsReserved = 0,
-                                    clonesReserved = 1,
+                                    elevatorsLeft = 0,
+                                    clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
                                 ),
                                 // если клон бежит вправо и выход справа, то нужно только
                                 // пробежать расстояние до выхода без расходования клонов
                                 Case(
                                     direction = Direction.RIGHT,
                                     distance = exitPos - position,
-                                    elevatorsReserved = 0,
-                                    clonesReserved = 0,
+                                    elevatorsLeft = 0,
+                                    clonesLeft = 1, // текущий - кто будет спасён
                                 ),
                             )
                         }
@@ -150,16 +158,16 @@ fun main(args: Array<String>) {
                                 Case(
                                     direction = Direction.RIGHT,
                                     distance = position - exitPos + 1,
-                                    elevatorsReserved = 0,
-                                    clonesReserved = 1,
+                                    elevatorsLeft = 0,
+                                    clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
                                 ),
                                 // если клон бежит влево и выход слева, то нужно только
                                 // пробежать расстояние до выхода без расходования клонов
                                 Case(
                                     direction = Direction.LEFT,
                                     distance = position - exitPos,
-                                    elevatorsReserved = 0,
-                                    clonesReserved = 0,
+                                    elevatorsLeft = 0,
+                                    clonesLeft = 1, // текущий - кто будет спасён
                                 ),
                             )
                         }
@@ -168,7 +176,7 @@ fun main(args: Array<String>) {
 
         val exitFloorCases = buildExitFloor()
 
-        return Drive(
+        return Area(
             floors = generateSequence(
                 seed = exitFloorCases,
             ) { upperFloor ->
@@ -210,8 +218,8 @@ fun main(args: Array<String>) {
                                         .map {
                                             it.copy(
                                                 distance = it.distance + 1,
-                                                elevatorsReserved = it.elevatorsReserved + 1,
-                                                clonesReserved = it.clonesReserved + 1,
+                                                elevatorsLeft = it.elevatorsLeft + 1,
+                                                clonesLeft = it.clonesLeft + 1,
                                             )
                                         }
                                 )
@@ -353,13 +361,35 @@ fun main(args: Array<String>) {
         )
     }
 
-    val driveMap = buildDrive()
+    val area = buildArea()
+
+    var clonesLeft = nbTotalClones
+    var elevatorsLeft = nbElevators
+
+    fun wait() {
+        println("WAIT")
+    }
+
+    fun block() {
+        println("BLOCK")
+        clonesLeft--
+    }
+
+    fun elevator() {
+        println("ELEVATOR")
+        clonesLeft--
+        elevatorsLeft--
+    }
 
     // game loop
     while (true) {
         val cloneFloor = input.nextInt() // floor of the leading clone
         val clonePos = input.nextInt() // position of the leading clone on its floor
-        val direction = input.next() // direction of the leading clone: LEFT or RIGHT
+
+        // direction of the leading clone: LEFT or RIGHT
+        val direction = input.next().let {
+            if (it == "LEFT") Direction.LEFT else Direction.RIGHT
+        }
 
         fun noClone() = cloneFloor < 0
 
@@ -367,18 +397,29 @@ fun main(args: Array<String>) {
             wait()
         }
 
-        wait()
+        TODO("Есть ещё кейсы - бежать к краям и где-то по пути строить лифты")
+
+        fun suits(
+            case: Case,
+        ): Boolean {
+            TODO()
+        }
+
+        val bestCase = area
+            .floors[cloneFloor]
+            .cases[clonePos]
+            .filter {
+                suits(it)
+            }
+            .minBy {
+                it.distance
+            }
+
+
     }
 }
 
 private fun debug(message: String) = System.err.println(message)
-
-@JvmName("_wait")
-private fun wait() = println("WAIT")
-
-private fun block() = println("BLOCK")
-
-private fun elevator() = println("ELEVATOR")
 
 /**
  * Направление движения клона
@@ -403,9 +444,9 @@ private data class Case(
     /**
      * Сколько лифтов минимум потребуется построить для достижения выхода
      */
-    val elevatorsReserved: Int,
+    val elevatorsLeft: Int,
     /**
      * Сколько клонов должно быть в запасе для достижения выхода
      */
-    val clonesReserved: Int,
+    val clonesLeft: Int,
 )
