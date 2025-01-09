@@ -31,6 +31,11 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
      */
     val workFloorsCount = exitFloor + 1
 
+    data class AreaPoint(
+        val floor: Int,
+        val position: Int,
+    )
+
     class Elevators {
 
         private val elevators: List<HashSet<Int>> = List(workFloorsCount) {
@@ -38,11 +43,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
         }
 
         fun registerElevator(
-            floorIndex: Int,
-            position: Int,
+            elevator: AreaPoint,
         ) {
-            if (floorIndex <= exitFloor) {
-                elevators[floorIndex] += position
+            if (elevator.floor <= exitFloor) {
+                elevators[elevator.floor] += elevator.position
             }
         }
 
@@ -62,8 +66,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
         elevators
             .registerElevator(
-                floorIndex = elevatorFloor,
-                position = elevatorPos,
+                elevator = AreaPoint(
+                    floor = elevatorFloor,
+                    position = elevatorPos,
+                ),
             )
     }
 
@@ -84,11 +90,6 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                 position = position,
                 newCases = newCases.toList(),
             )
-        }
-
-        fun optimizeCases() {
-            //TODO("оптимизировать кейсы - убрать менее быстрые при текущих или более жёстких ограничениях")
-            // более жёсткие ограничения - по всем признакам, не по какому-то одному
         }
 
         fun addCases(
@@ -366,8 +367,6 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 newCases = horizontalRunCase.cases,
                             )
                         }
-
-                    optimizeCases()
                 }
             }
                 .take(workFloorsCount)
@@ -386,15 +385,11 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
     }
 
     fun blockClone() {
-        println("BLOCK")
         clonesLeft--
+        println("BLOCK")
     }
 
-    fun buildElevator() {
-        println("ELEVATOR")
-        clonesLeft--
-        elevatorsLeft--
-    }
+    val newElevators = hashSetOf<AreaPoint>()
 
     // game loop
     while (true) {
@@ -403,6 +398,11 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
         // direction of the leading clone: LEFT or RIGHT
         val direction = input.next().let { Direction.valueOf(it) }
 
+        val clone = AreaPoint(
+            floor = cloneFloor,
+            position = clonePos,
+        )
+
         fun noClone() = cloneFloor < 0
 
         if (noClone()) {
@@ -410,25 +410,33 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
             continue
         }
 
+        fun buildElevator() {
+            clonesLeft--
+            elevatorsLeft--
+            newElevators += clone
+            println("ELEVATOR")
+        }
+
         val isElevator = elevators
             .isElevator(
                 floorIndex = cloneFloor,
                 position = clonePos,
-            )
+            ) || clone in newElevators
 
+        // ждём подъёма на лифте
         if (isElevator) {
             doNothingAndWait()
             continue
-        }
-
-        fun Case.satisfiesConstraints(): Boolean {
-            return this.clonesLeft <= clonesLeft && this.elevatorsLeft <= elevatorsLeft
         }
 
         val bestCase = area
             .floors[cloneFloor]
             .cases[clonePos]
             .filter {
+                fun Case.satisfiesConstraints(): Boolean {
+                    return this.clonesLeft <= clonesLeft && this.elevatorsLeft <= elevatorsLeft
+                }
+
                 it.satisfiesConstraints()
             }
             .minBy {
