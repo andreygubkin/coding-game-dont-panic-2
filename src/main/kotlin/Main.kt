@@ -4,7 +4,7 @@ import java.util.*
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
  **/
-fun main(args : Array<String>) {
+fun main(args: Array<String>) {
 
     val input = Scanner(System.`in`)
     val nbFloors = input.nextInt() // number of floors
@@ -30,19 +30,19 @@ fun main(args : Array<String>) {
         }
 
         fun registerElevator(
-            floor: Int,
+            floorIndex: Int,
             position: Int,
         ) {
-            if (floor <= exitFloor) {
-                elevators[floor] += position
+            if (floorIndex <= exitFloor) {
+                elevators[floorIndex] += position
             }
         }
 
         fun isElevator(
-            floor: Int,
+            floorIndex: Int,
             position: Int,
         ): Boolean {
-            return position in elevators[floor]
+            return position in elevators[floorIndex]
         }
     }
 
@@ -54,7 +54,7 @@ fun main(args : Array<String>) {
 
         elevators
             .registerElevator(
-                floor = elevatorFloor,
+                floorIndex = elevatorFloor,
                 position = elevatorPos,
             )
     }
@@ -71,6 +71,21 @@ fun main(args : Array<String>) {
         fun addCases(
             position: Int,
             vararg newCases: Case,
+        ) {
+            addCases(
+                position = position,
+                newCases = newCases.toList(),
+            )
+        }
+
+        fun optimizeCases() {
+            TODO("оптимизировать кейсы - убрать менее быстрые при текущих или более жёстких ограничениях")
+            // более жёсткие ограничения - по всем признакам, не по какому-то одному
+        }
+
+        fun addCases(
+            position: Int,
+            newCases: List<Case>,
         ) {
             floorCases[position] += newCases
         }
@@ -97,7 +112,7 @@ fun main(args : Array<String>) {
 
                     (exitPos - 1 downTo 0)
                         .takeWhile { position ->
-                            !elevators.isElevator(floor = floorIndex, position = position)
+                            !elevators.isElevator(floorIndex = floorIndex, position = position)
                         }
                         .forEach { position ->
                             // так как этаж с выходом, то не нужен запас лифтов
@@ -124,7 +139,7 @@ fun main(args : Array<String>) {
 
                     (exitPos + 1 until width)
                         .takeWhile { position ->
-                            !elevators.isElevator(floor = floorIndex, position = position)
+                            !elevators.isElevator(floorIndex = floorIndex, position = position)
                         }
                         .forEach { position ->
                             // так как этаж с выходом, то не нужен запас лифтов
@@ -154,18 +169,187 @@ fun main(args : Array<String>) {
         val exitFloorCases = buildExitFloor()
 
         return Drive(
-           floors = generateSequence(
-               seed = exitFloorCases,
-           ) { previousFloor ->
-               Floor(
-                   floorIndex = previousFloor.floorIndex - 1,
-               ).apply {
-                   TODO()
-               }
-           }
-               .take(workFloorsCount)
-               .toList()
-               .reversed()
+            floors = generateSequence(
+                seed = exitFloorCases,
+            ) { upperFloor ->
+                Floor(
+                    floorIndex = upperFloor.floorIndex - 1,
+                ).apply {
+
+                    val existingElevatorCasesByPosition = mutableMapOf<Int, List<Case>>()
+
+                    (0 until width)
+                        .forEach { position ->
+                            val isElevator = elevators
+                                .isElevator(
+                                    floorIndex = floorIndex,
+                                    position = position,
+                                )
+
+                            if (isElevator) {
+                                // вариант 1: подняться на существующем лифте
+                                addCases(
+                                    position = position,
+                                    newCases = upperFloor
+                                        .cases[position]
+                                        .map {
+                                            it.copy(
+                                                distance = it.distance + 1,
+                                            )
+                                        }
+                                        .also {
+                                            existingElevatorCasesByPosition[position] = it
+                                        }
+                                )
+                            } else {
+                                // вариант 2: построить лифт (уменьшив запасы лифтов и клонов)
+                                addCases(
+                                    position = position,
+                                    newCases = upperFloor
+                                        .cases[position]
+                                        .map {
+                                            it.copy(
+                                                distance = it.distance + 1,
+                                                elevatorsReserved = it.elevatorsReserved + 1,
+                                                clonesReserved = it.clonesReserved + 1,
+                                            )
+                                        }
+                                )
+                            }
+                        }
+
+                    class HorizontalRunCase(
+                        val position: Int,
+                        val cases: List<Case>,
+                        val isElevator: Boolean,
+                    )
+
+                    // вариант 3: бежать к лифту налево
+                    val leftMostPosition = 0
+                    generateSequence(
+                        HorizontalRunCase(
+                            position = leftMostPosition,
+                            cases = emptyList(), // с левой позиции бесполезно бежать налево
+                            isElevator = elevators
+                                .isElevator(
+                                    floorIndex = floorIndex,
+                                    position = leftMostPosition,
+                                )
+                        )
+                    ) { previousCase ->
+
+                        val currentPosition = previousCase.position + 1
+
+                        val isElevator = elevators
+                            .isElevator(
+                                floorIndex = floorIndex,
+                                position = currentPosition,
+                            )
+
+                        if (isElevator) {
+                            HorizontalRunCase(
+                                position = currentPosition,
+                                cases = emptyList(), // из лифта налево не убежишь - никуда не убежишь
+                                isElevator = true,
+                            )
+                        } else {
+                            if (previousCase.isElevator) {
+                                HorizontalRunCase(
+                                    position = currentPosition,
+                                    // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
+                                    cases = existingElevatorCasesByPosition[previousCase.position]!!
+                                        .map {
+                                            it.copy(distance = it.distance + 1)
+                                        },
+                                    isElevator = false,
+                                )
+                            } else {
+                                HorizontalRunCase(
+                                    position = currentPosition,
+                                    cases = previousCase
+                                        .cases
+                                        .map {
+                                            it.copy(distance = it.distance + 1)
+                                        },
+                                    isElevator = false,
+                                )
+                            }
+                        }
+                    }
+                        .take(width)
+                        .forEach { horizontalRunCase ->
+                            addCases(
+                                position = horizontalRunCase.position,
+                                newCases = horizontalRunCase.cases,
+                            )
+                        }
+
+                    // вариант 4: бежать к лифту направо
+                    val rightMostPosition = width - 1
+                    generateSequence(
+                        HorizontalRunCase(
+                            position = rightMostPosition,
+                            cases = emptyList(), // с правой позиции бесполезно бежать направо
+                            isElevator = elevators
+                                .isElevator(
+                                    floorIndex = floorIndex,
+                                    position = rightMostPosition,
+                                )
+                        )
+                    ) { previousCase ->
+
+                        val currentPosition = previousCase.position - 1
+
+                        val isElevator = elevators
+                            .isElevator(
+                                floorIndex = floorIndex,
+                                position = currentPosition,
+                            )
+
+                        if (isElevator) {
+                            HorizontalRunCase(
+                                position = currentPosition,
+                                cases = emptyList(), // из лифта направо не убежишь - никуда не убежишь
+                                isElevator = true,
+                            )
+                        } else {
+                            if (previousCase.isElevator) {
+                                HorizontalRunCase(
+                                    position = currentPosition,
+                                    // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
+                                    cases = existingElevatorCasesByPosition[previousCase.position]!!
+                                        .map {
+                                            it.copy(distance = it.distance + 1)
+                                        },
+                                    isElevator = false,
+                                )
+                            } else {
+                                HorizontalRunCase(
+                                    position = currentPosition,
+                                    cases = previousCase
+                                        .cases
+                                        .map {
+                                            it.copy(distance = it.distance + 1)
+                                        },
+                                    isElevator = false,
+                                )
+                            }
+                        }
+                    }
+                        .take(width)
+                        .forEach { horizontalRunCase ->
+                            addCases(
+                                position = horizontalRunCase.position,
+                                newCases = horizontalRunCase.cases,
+                            )
+                        }
+
+                    optimizeCases()
+                }
+            }
+                .take(workFloorsCount)
+                .toList()
+                .reversed()
         )
     }
 
