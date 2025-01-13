@@ -10,7 +10,9 @@ fun main() {
     lastMeasuredAt = startedAt
 
     fun warmUpJit() {
+        debug("before warmUpJit")
         Area.buildArea(config = GameConfig.JIT_WARM_UP_CONFIG)
+        debug("after warmUpJit")
     }
 
     thread {
@@ -54,6 +56,17 @@ fun main() {
 
     val newElevators = hashSetOf<AreaPoint>()
 
+    fun buildElevator(
+        elevator: AreaPoint,
+    ): Nothing {
+        resources = resources.copy(
+            clonesLeft = resources.clonesLeft - 1,
+            elevatorsLeft = resources.elevatorsLeft - 1,
+        )
+        newElevators += elevator
+        finishRound(Command.BUILD_ELEVATOR)
+    }
+
     debug("loop start")
 
     // game loop
@@ -67,19 +80,12 @@ fun main() {
             // direction of the leading clone: LEFT or RIGHT (or NONE)
             val direction = Direction.valueOf(input.next())
 
+            debug("round: $clone, $direction")
+
             fun noClone() = clone.position < 0
 
             if (noClone()) {
                 doNothingAndWait()
-            }
-
-            fun buildElevator(): Nothing {
-                resources = resources.copy(
-                    clonesLeft = resources.clonesLeft - 1,
-                    elevatorsLeft = resources.elevatorsLeft - 1,
-                )
-                newElevators += clone
-                finishRound(Command.BUILD_ELEVATOR)
             }
 
             val isElevator = area.isElevator(clone) || clone in newElevators
@@ -100,7 +106,9 @@ fun main() {
                 }
 
             if (bestCase.action.buildElevator) {
-                buildElevator()
+                buildElevator(
+                    elevator = clone,
+                )
             }
 
             if (bestCase.action.direction == direction) {
@@ -112,7 +120,7 @@ fun main() {
             }
         } catch (e: FinishRoundException) {
             resources = resources.copy(roundsLeft = resources.roundsLeft - 1)
-            debug("round end")
+            debug("round end ${e.command}")
             println(e.command.message)
         }
     }
