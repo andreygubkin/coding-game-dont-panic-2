@@ -1,5 +1,10 @@
 import Case.Companion.optimize
+import java.time.Duration
+import java.time.Instant
 import java.util.*
+
+private lateinit var startedAt: Instant
+private lateinit var lastMeasuredAt: Instant
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -7,12 +12,17 @@ import java.util.*
  **/
 fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
+    startedAt = Instant.now()
+    lastMeasuredAt = startedAt
+
     val input = Scanner(System.`in`)
 
+    // number of floors in the area. A clone can move between floor 0 and floor nbFloors - 1
     @Suppress("UNUSED_VARIABLE")
-    val nbFloors = input.nextInt() // number of floors in the area. A clone can move between floor 0 and floor nbFloors - 1
+    val nbFloors = input.nextInt()
 
-    val width = input.nextInt() // the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+    // the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+    val width = input.nextInt()
 
     // клон может не добежать 1 шаг, так как раунды кончились
     // так что недостаточно только считать клонов
@@ -89,20 +99,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
         fun optimizeCases() {
             floorCases
                 .forEach { positionCases ->
-                    val optimizedPositionCases = positionCases.optimize()
+                    val optimizedPositionCases = positionCases.optimize(canOmit = false)
                     positionCases.clear()
                     positionCases.addAll(optimizedPositionCases)
                 }
-        }
-
-        fun addCases(
-            position: Int,
-            vararg newCases: Case,
-        ) {
-            addCases(
-                position = position,
-                newCases = newCases.toList(),
-            )
         }
 
         fun addCases(
@@ -117,7 +117,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                 cases
                     .mapIndexed { index, cases -> index to cases }
                     .joinToString("\n") {
-                        "\t${it.first}: ${it.second.joinToString(", ")}" 
+                        "\t${it.first}: ${it.second.joinToString(", ")}"
                     }
             }"
         }
@@ -148,28 +148,30 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                 .apply {
                     addCases(
                         position = exitPos,
-                        Case(
-                            idea = CaseIdea.EXIT,
-                            action = CaseAction(
-                                direction = Direction.LEFT,
-                                buildElevator = false,
+                        newCases = listOf(
+                            Case(
+                                idea = CaseIdea.EXIT,
+                                action = CaseAction(
+                                    direction = Direction.LEFT,
+                                    buildElevator = false,
+                                ),
+                                constraints = StateConstraints(
+                                    roundsLeft = 0,
+                                    elevatorsLeft = 0,
+                                    clonesLeft = 1, // текущий - кто будет спасён
+                                ),
                             ),
-                            constraints = StateConstraints(
-                                roundsLeft = 0,
-                                elevatorsLeft = 0,
-                                clonesLeft = 1, // текущий - кто будет спасён
-                            ),
-                        ),
-                        Case(
-                            idea = CaseIdea.EXIT,
-                            action = CaseAction(
-                                direction = Direction.RIGHT,
-                                buildElevator = false,
-                            ),
-                            constraints = StateConstraints(
-                                roundsLeft = 0,
-                                elevatorsLeft = 0,
-                                clonesLeft = 1, // текущий - кто будет спасён
+                            Case(
+                                idea = CaseIdea.EXIT,
+                                action = CaseAction(
+                                    direction = Direction.RIGHT,
+                                    buildElevator = false,
+                                ),
+                                constraints = StateConstraints(
+                                    roundsLeft = 0,
+                                    elevatorsLeft = 0,
+                                    clonesLeft = 1, // текущий - кто будет спасён
+                                ),
                             ),
                         ),
                     )
@@ -184,30 +186,32 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 position = position,
                                 // если клон бежит влево, а выход справа, то помимо расстояния до выхода
                                 // надо ещё и развернуться - заблокировав одного клона из резерва
-                                Case(
-                                    idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
-                                    action = CaseAction(
-                                        direction = Direction.LEFT,
-                                        buildElevator = false,
+                                newCases = listOf(
+                                    Case(
+                                        idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
+                                        action = CaseAction(
+                                            direction = Direction.LEFT,
+                                            buildElevator = false,
+                                        ),
+                                        constraints = StateConstraints(
+                                            roundsLeft = exitPos - position + 1,
+                                            elevatorsLeft = 0,
+                                            clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
+                                        ),
                                     ),
-                                    constraints = StateConstraints(
-                                        roundsLeft = exitPos - position + 1,
-                                        elevatorsLeft = 0,
-                                        clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
-                                    ),
-                                ),
-                                // если клон бежит вправо и выход справа, то нужно только
-                                // пробежать расстояние до выхода без расходования клонов
-                                Case(
-                                    idea = CaseIdea.JUST_RUN_TO_EXIT,
-                                    action = CaseAction(
-                                        direction = Direction.RIGHT,
-                                        buildElevator = false,
-                                    ),
-                                    constraints = StateConstraints(
-                                        roundsLeft = exitPos - position,
-                                        elevatorsLeft = 0,
-                                        clonesLeft = 1, // текущий - кто будет спасён
+                                    // если клон бежит вправо и выход справа, то нужно только
+                                    // пробежать расстояние до выхода без расходования клонов
+                                    Case(
+                                        idea = CaseIdea.JUST_RUN_TO_EXIT,
+                                        action = CaseAction(
+                                            direction = Direction.RIGHT,
+                                            buildElevator = false,
+                                        ),
+                                        constraints = StateConstraints(
+                                            roundsLeft = exitPos - position,
+                                            elevatorsLeft = 0,
+                                            clonesLeft = 1, // текущий - кто будет спасён
+                                        ),
                                     ),
                                 ),
                             )
@@ -223,30 +227,32 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 position = position,
                                 // если клон бежит вправо, а выход слева, то помимо расстояния до выхода
                                 // надо ещё и развернуться - заблокировав одного клона из резерва
-                                Case(
-                                    idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
-                                    action = CaseAction(
-                                        direction = Direction.RIGHT,
-                                        buildElevator = false,
+                                newCases = listOf(
+                                    Case(
+                                        idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
+                                        action = CaseAction(
+                                            direction = Direction.RIGHT,
+                                            buildElevator = false,
+                                        ),
+                                        constraints = StateConstraints(
+                                            roundsLeft = position - exitPos + 1,
+                                            elevatorsLeft = 0,
+                                            clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
+                                        ),
                                     ),
-                                    constraints = StateConstraints(
-                                        roundsLeft = position - exitPos + 1,
-                                        elevatorsLeft = 0,
-                                        clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
-                                    ),
-                                ),
-                                // если клон бежит влево и выход слева, то нужно только
-                                // пробежать расстояние до выхода без расходования клонов
-                                Case(
-                                    idea = CaseIdea.JUST_RUN_TO_EXIT,
-                                    action = CaseAction(
-                                        direction = Direction.LEFT,
-                                        buildElevator = false,
-                                    ),
-                                    constraints = StateConstraints(
-                                        roundsLeft = position - exitPos,
-                                        elevatorsLeft = 0,
-                                        clonesLeft = 1, // текущий - кто будет спасён
+                                    // если клон бежит влево и выход слева, то нужно только
+                                    // пробежать расстояние до выхода без расходования клонов
+                                    Case(
+                                        idea = CaseIdea.JUST_RUN_TO_EXIT,
+                                        action = CaseAction(
+                                            direction = Direction.LEFT,
+                                            buildElevator = false,
+                                        ),
+                                        constraints = StateConstraints(
+                                            roundsLeft = position - exitPos,
+                                            elevatorsLeft = 0,
+                                            clonesLeft = 1, // текущий - кто будет спасён
+                                        ),
                                     ),
                                 ),
                             )
@@ -255,6 +261,7 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
         }
 
         val exitFloorCases = buildExitFloor()
+        debug("exit floor ready")
 
         return Area(
             floors = generateSequence(
@@ -262,253 +269,257 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
             ) { upperFloor ->
                 Floor(
                     floorIndex = upperFloor.floorIndex - 1,
-                ).apply {
+                )
+                    .apply {
 
-                    val existingElevatorCasesByPosition = mutableMapOf<Int, List<Case>>()
-                    val newElevatorCasesByPosition = mutableMapOf<Int, List<Case>>()
+                        val existingElevatorCasesByPosition = mutableMapOf<Int, List<Case>>()
+                        val newElevatorCasesByPosition = mutableMapOf<Int, List<Case>>()
 
-                    (0 until width)
-                        .forEach { position ->
+                        (0 until width)
+                            .forEach { position ->
+                                val isElevator = elevators
+                                    .isElevator(
+                                        floorIndex = floorIndex,
+                                        position = position,
+                                    )
+
+                                if (isElevator) {
+                                    // вариант 1: подняться на существующем лифте
+                                    addCases(
+                                        position = position,
+                                        newCases = upperFloor
+                                            .cases[position]
+                                            .map {
+                                                it
+                                                    .copy(
+                                                        // так как лифт уже есть, то добавляется раунд
+                                                        // на подъём на лифте, а дополнительные ресурсы не нужны
+                                                        constraints = it.constraints.copy(roundsLeft = it.constraints.roundsLeft + 1),
+                                                        idea = CaseIdea.USE_EXISTING_ELEVATOR,
+                                                        action = it.action.copy(
+                                                            buildElevator = false,
+                                                        ),
+                                                    )
+                                            }
+                                            .also {
+                                                existingElevatorCasesByPosition[position] = it
+                                            }
+                                    )
+                                } else {
+                                    // вариант 2: построить лифт (уменьшив запасы лифтов и клонов = увеличив требуемые запасы)
+                                    addCases(
+                                        position = position,
+                                        newCases = upperFloor
+                                            .cases[position]
+                                            .map {
+                                                it.copy(
+                                                    action = it.action.copy(
+                                                        buildElevator = true,
+                                                    ),
+                                                    // построить лифт и подняться на нём
+                                                    constraints = it.constraints.copy(
+                                                        elevatorsLeft = it.constraints.elevatorsLeft + 1,
+                                                        clonesLeft = it.constraints.clonesLeft + 1,
+                                                        roundsLeft = it.constraints.roundsLeft + 2,
+                                                    ),
+                                                    idea = CaseIdea.BUILD_NEW_ELEVATOR,
+                                                )
+                                            }
+                                            .also {
+                                                newElevatorCasesByPosition[position] = it
+                                            }
+                                    )
+                                }
+                            }
+
+                        class HorizontalRunCase(
+                            val position: Int,
+                            val cases: List<Case>,
+                            val isElevator: Boolean,
+                        )
+
+                        // вариант 3: бежать налево к ближнему лифту или к лучшей возможной точке построения нового лифта
+                        val leftMostPosition = 0
+                        generateSequence(
+                            HorizontalRunCase(
+                                position = leftMostPosition,
+                                cases = emptyList(), // с левой позиции бесполезно бежать налево
+                                isElevator = elevators
+                                    .isElevator(
+                                        floorIndex = floorIndex,
+                                        position = leftMostPosition,
+                                    ),
+                            )
+                        ) { previousCase ->
+
+                            val currentPosition = previousCase.position + 1
+
                             val isElevator = elevators
                                 .isElevator(
                                     floorIndex = floorIndex,
-                                    position = position,
+                                    position = currentPosition,
                                 )
 
                             if (isElevator) {
-                                // вариант 1: подняться на существующем лифте
-                                addCases(
-                                    position = position,
-                                    newCases = upperFloor
-                                        .cases[position]
-                                        .map {
-                                            it
-                                                .copy(
-                                                    // так как лифт уже есть, то добавляется раунд
-                                                    // на подъём на лифте, а дополнительные ресурсы не нужны
-                                                    constraints = it.constraints.copy(roundsLeft = it.constraints.roundsLeft + 1),
-                                                    idea = CaseIdea.USE_EXISTING_ELEVATOR,
-                                                    action = it.action.copy(
+                                HorizontalRunCase(
+                                    position = currentPosition,
+                                    cases = emptyList(), // из лифта налево не убежишь - никуда не убежишь
+                                    isElevator = true,
+                                )
+                            } else {
+                                val previousCases: List<Case> = if (previousCase.isElevator) {
+                                    // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
+                                    existingElevatorCasesByPosition[previousCase.position]!!
+                                } else {
+                                    // предыдущая позиция - не лифт и текущая - не лифт
+                                    // на предыдущей позиции могли быть кейсы на построение нового лифта
+                                    // или бег влево к существующему лифту
+                                    // и надо понять, стоит ли в текущей позиции бежать влево ради этих кейсов
+
+                                    newElevatorCasesByPosition[previousCase.position]!! + previousCase.cases
+                                }.optimize(canOmit = true)
+
+                                // здесь нужно взять все варианты ресурсов с предыдущего шага
+                                // и добавить +1/+2 к дистанции в зависимости от направления
+
+                                HorizontalRunCase(
+                                    position = currentPosition,
+
+                                    cases = previousCases
+                                        .filter {
+                                            it.action.direction == Direction.LEFT
+                                        }
+                                        .flatMap {
+                                            listOf(
+                                                // просто бежим налево к предыдущим кейсам
+                                                it.copy(
+                                                    action = CaseAction(
+                                                        direction = Direction.LEFT,
                                                         buildElevator = false,
                                                     ),
-                                                )
-                                        }
-                                        .also {
-                                            existingElevatorCasesByPosition[position] = it
-                                        }
+                                                    idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
+                                                    // движение к предыдущему кейсу
+                                                    constraints = it.constraints.copy(
+                                                        roundsLeft = it.constraints.roundsLeft + 1,
+                                                    ),
+                                                ),
+                                                // разворачиваемся и бежим налево к предыдущим кейсам
+                                                it.copy(
+                                                    action = CaseAction(
+                                                        direction = Direction.RIGHT,
+                                                        buildElevator = false,
+                                                    ),
+                                                    // блок и движение к предыдущему кейсу
+                                                    constraints = it.constraints.copy(
+                                                        clonesLeft = it.constraints.clonesLeft + 1,
+                                                        roundsLeft = it.constraints.roundsLeft + 2,
+                                                    ),
+                                                    idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
+                                                ),
+                                            )
+                                        },
+                                    isElevator = false,
+                                )
+                            }
+                        }
+                            .take(width)
+                            .forEach { horizontalRunCase ->
+                                addCases(
+                                    position = horizontalRunCase.position,
+                                    newCases = horizontalRunCase.cases,
+                                )
+                            }
+
+                        // вариант 4: бежать направо к ближнему лифту или к лучшей возможной точке построения нового лифта
+                        val rightMostPosition = width - 1
+                        generateSequence(
+                            HorizontalRunCase(
+                                position = rightMostPosition,
+                                cases = emptyList(), // с правой позиции бесполезно бежать вправо
+                                isElevator = elevators
+                                    .isElevator(
+                                        floorIndex = floorIndex,
+                                        position = rightMostPosition,
+                                    ),
+                            )
+                        ) { previousCase ->
+
+                            val currentPosition = previousCase.position - 1
+
+                            val isElevator = elevators
+                                .isElevator(
+                                    floorIndex = floorIndex,
+                                    position = currentPosition,
+                                )
+
+                            if (isElevator) {
+                                HorizontalRunCase(
+                                    position = currentPosition,
+                                    cases = emptyList(), // из лифта направо не убежишь - никуда не убежишь
+                                    isElevator = true,
                                 )
                             } else {
-                                // вариант 2: построить лифт (уменьшив запасы лифтов и клонов = увеличив требуемые запасы)
-                                addCases(
-                                    position = position,
-                                    newCases = upperFloor
-                                        .cases[position]
-                                        .map {
-                                            it.copy(
-                                                action = it.action.copy(
-                                                    buildElevator = true,
+                                val previousCases: List<Case> = if (previousCase.isElevator) {
+                                    // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
+                                    existingElevatorCasesByPosition[previousCase.position]!!
+                                } else {
+                                    // предыдущая позиция - не лифт и текущая - не лифт
+                                    // на предыдущей позиции могли быть кейсы на построение нового лифта
+                                    // или бег вправо к существующему лифту
+                                    // и надо понять, стоит ли в текущей позиции бежать вправо ради этих кейсов
+
+                                    newElevatorCasesByPosition[previousCase.position]!! + previousCase.cases
+                                }
+
+                                HorizontalRunCase(
+                                    position = currentPosition,
+                                    cases = previousCases
+                                        .filter {
+                                            it.action.direction == Direction.RIGHT
+                                        }
+                                        .flatMap {
+                                            listOf(
+                                                it.copy(
+                                                    action = CaseAction(
+                                                        direction = Direction.RIGHT,
+                                                        buildElevator = false,
+                                                    ),
+                                                    idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
+                                                    constraints = it.constraints.copy(
+                                                        roundsLeft = it.constraints.roundsLeft + 1,
+                                                    ),
                                                 ),
-                                                // построить лифт и подняться на нём
-                                                constraints = it.constraints.copy(
-                                                    elevatorsLeft = it.constraints.elevatorsLeft + 1,
-                                                    clonesLeft = it.constraints.clonesLeft + 1,
-                                                    roundsLeft = it.constraints.roundsLeft + 2,
+                                                it.copy(
+                                                    action = CaseAction(
+                                                        direction = Direction.LEFT,
+                                                        buildElevator = false,
+                                                    ),
+                                                    constraints = it.constraints.copy(
+                                                        clonesLeft = it.constraints.clonesLeft + 1,
+                                                        roundsLeft = it.constraints.roundsLeft + 2,
+                                                    ),
+                                                    idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                 ),
-                                                idea = CaseIdea.BUILD_NEW_ELEVATOR,
                                             )
                                         }
-                                        .also {
-                                            newElevatorCasesByPosition[position] = it
-                                        }
+                                        .optimize(canOmit = true),
+                                    isElevator = false,
                                 )
                             }
                         }
-
-                    class HorizontalRunCase(
-                        val position: Int,
-                        val cases: List<Case>,
-                        val isElevator: Boolean,
-                    )
-
-                    // вариант 3: бежать налево к ближнему лифту или к лучшей возможной точке построения нового лифта
-                    val leftMostPosition = 0
-                    generateSequence(
-                        HorizontalRunCase(
-                            position = leftMostPosition,
-                            cases = emptyList(), // с левой позиции бесполезно бежать налево
-                            isElevator = elevators
-                                .isElevator(
-                                    floorIndex = floorIndex,
-                                    position = leftMostPosition,
-                                ),
-                        )
-                    ) { previousCase ->
-
-                        val currentPosition = previousCase.position + 1
-
-                        val isElevator = elevators
-                            .isElevator(
-                                floorIndex = floorIndex,
-                                position = currentPosition,
-                            )
-
-                        if (isElevator) {
-                            HorizontalRunCase(
-                                position = currentPosition,
-                                cases = emptyList(), // из лифта налево не убежишь - никуда не убежишь
-                                isElevator = true,
-                            )
-                        } else {
-                            val previousCases: List<Case> = if (previousCase.isElevator) {
-                                // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
-                                existingElevatorCasesByPosition[previousCase.position]!!
-                            } else {
-                                // предыдущая позиция - не лифт и текущая - не лифт
-                                // на предыдущей позиции могли быть кейсы на построение нового лифта
-                                // или бег влево к существующему лифту
-                                // и надо понять, стоит ли в текущей позиции бежать влево ради этих кейсов
-
-                                newElevatorCasesByPosition[previousCase.position]!! + previousCase.cases
-                            }.optimize()
-
-                            // здесь нужно взять все варианты ресурсов с предыдущего шага
-                            // и добавить +1/+2 к дистанции в зависимости от направления
-
-                            HorizontalRunCase(
-                                position = currentPosition,
-
-                                cases = previousCases
-                                    .filter {
-                                        it.action.direction == Direction.LEFT
-                                    }
-                                    .flatMap {
-                                        listOf(
-                                            // просто бежим налево к предыдущим кейсам
-                                            it.copy(
-                                                action = CaseAction(
-                                                    direction = Direction.LEFT,
-                                                    buildElevator = false,
-                                                ),
-                                                idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
-                                                // движение к предыдущему кейсу
-                                                constraints = it.constraints.copy(
-                                                    roundsLeft = it.constraints.roundsLeft + 1,
-                                                ),
-                                            ),
-                                            // разворачиваемся и бежим налево к предыдущим кейсам
-                                            it.copy(
-                                                action = CaseAction(
-                                                    direction = Direction.RIGHT,
-                                                    buildElevator = false,
-                                                ),
-                                                // блок и движение к предыдущему кейсу
-                                                constraints = it.constraints.copy(
-                                                    clonesLeft = it.constraints.clonesLeft + 1,
-                                                    roundsLeft = it.constraints.roundsLeft + 2,
-                                                ),
-                                                idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
-                                            ),
-                                        )
-                                    },
-                                isElevator = false,
-                            )
-                        }
-                    }
-                        .take(width)
-                        .forEach { horizontalRunCase ->
-                            addCases(
-                                position = horizontalRunCase.position,
-                                newCases = horizontalRunCase.cases,
-                            )
-                        }
-
-                    // вариант 4: бежать направо к ближнему лифту или к лучшей возможной точке построения нового лифта
-                    val rightMostPosition = width - 1
-                    generateSequence(
-                        HorizontalRunCase(
-                            position = rightMostPosition,
-                            cases = emptyList(), // с правой позиции бесполезно бежать вправо
-                            isElevator = elevators
-                                .isElevator(
-                                    floorIndex = floorIndex,
-                                    position = rightMostPosition,
-                                ),
-                        )
-                    ) { previousCase ->
-
-                        val currentPosition = previousCase.position - 1
-
-                        val isElevator = elevators
-                            .isElevator(
-                                floorIndex = floorIndex,
-                                position = currentPosition,
-                            )
-
-                        if (isElevator) {
-                            HorizontalRunCase(
-                                position = currentPosition,
-                                cases = emptyList(), // из лифта направо не убежишь - никуда не убежишь
-                                isElevator = true,
-                            )
-                        } else {
-                            val previousCases: List<Case> = if (previousCase.isElevator) {
-                                // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
-                                existingElevatorCasesByPosition[previousCase.position]!!
-                            } else {
-                                // предыдущая позиция - не лифт и текущая - не лифт
-                                // на предыдущей позиции могли быть кейсы на построение нового лифта
-                                // или бег вправо к существующему лифту
-                                // и надо понять, стоит ли в текущей позиции бежать вправо ради этих кейсов
-
-                                newElevatorCasesByPosition[previousCase.position]!! + previousCase.cases
+                            .take(width)
+                            .forEach { horizontalRunCase ->
+                                addCases(
+                                    position = horizontalRunCase.position,
+                                    newCases = horizontalRunCase.cases,
+                                )
                             }
 
-                            HorizontalRunCase(
-                                position = currentPosition,
-                                cases = previousCases
-                                    .filter {
-                                        it.action.direction == Direction.RIGHT
-                                    }
-                                    .flatMap {
-                                        listOf(
-                                            it.copy(
-                                                action = CaseAction(
-                                                    direction = Direction.RIGHT,
-                                                    buildElevator = false,
-                                                ),
-                                                idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
-                                                constraints = it.constraints.copy(
-                                                    roundsLeft = it.constraints.roundsLeft + 1,
-                                                ),
-                                            ),
-                                            it.copy(
-                                                action = CaseAction(
-                                                    direction = Direction.LEFT,
-                                                    buildElevator = false,
-                                                ),
-                                                constraints = it.constraints.copy(
-                                                    clonesLeft = it.constraints.clonesLeft + 1,
-                                                    roundsLeft = it.constraints.roundsLeft + 2,
-                                                ),
-                                                idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
-                                            ),
-                                        )
-                                    }
-                                    .optimize(),
-                                isElevator = false,
-                            )
-                        }
+                        optimizeCases()
                     }
-                        .take(width)
-                        .forEach { horizontalRunCase ->
-                            addCases(
-                                position = horizontalRunCase.position,
-                                newCases = horizontalRunCase.cases,
-                            )
-                        }
-
-                    optimizeCases()
-                }
+                    .also {
+                        debug("floor ${it.floorIndex} ready")
+                    }
             }
                 .take(workFloorsCount)
                 .toList()
@@ -516,9 +527,9 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
         )
     }
 
+    debug("before buildArea")
     val area = buildArea()
-
-    area.floors.reversed().forEach { debug(it) }
+    debug("after buildArea")
 
     var resources = StateConstraints(
         clonesLeft = nbTotalClones,
@@ -546,6 +557,8 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
     val newElevators = hashSetOf<AreaPoint>()
 
+    debug("loop start")
+
     // game loop
     while (true) {
         try {
@@ -565,9 +578,9 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
             fun buildElevator(): Nothing {
                 resources = resources.copy(
-                        clonesLeft = resources.clonesLeft - 1,
-                        elevatorsLeft = resources.elevatorsLeft - 1,
-                    )
+                    clonesLeft = resources.clonesLeft - 1,
+                    elevatorsLeft = resources.elevatorsLeft - 1,
+                )
                 newElevators += clone
                 finishRound(Command.BUILD_ELEVATOR)
             }
@@ -600,8 +613,9 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                 // клон двигается в другом направлении, надо развернуть
                 blockClone()
             }
-        } catch(e: FinishRoundException) {
+        } catch (e: FinishRoundException) {
             resources = resources.copy(roundsLeft = resources.roundsLeft - 1)
+            debug("round end")
             println(e.command.message)
         }
     }
@@ -609,7 +623,11 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
 @Suppress("unused")
 private fun debug(message: Any) {
-    System.err.println(message.toString())
+    val now = Instant.now()
+    val elapsedTimeMs = Duration.between(startedAt, now).toMillis()
+    val elapsedTimeSinceLastMeasureMs = Duration.between(lastMeasuredAt, now).toMillis()
+    lastMeasuredAt = now
+    System.err.println("$elapsedTimeMs(+$elapsedTimeSinceLastMeasureMs) ms: $message")
 }
 
 /**
@@ -690,7 +708,13 @@ private data class Case(
          * Отбросить варианты с более жёсткими ограничениями,
          * но с теми же или худшими результатами (distance)
          */
-        fun List<Case>.optimize(): List<Case> {
+        fun List<Case>.optimize(
+            canOmit: Boolean,
+        ): List<Case> {
+            if (canOmit) {
+                return this
+            }
+
             return this
                 .groupBy {
                     it.action.direction
@@ -728,7 +752,7 @@ private data class Case(
 
 private class FinishRoundException(
     val command: Command,
-): Exception()
+) : Exception()
 
 private data class StateConstraints(
     /**
