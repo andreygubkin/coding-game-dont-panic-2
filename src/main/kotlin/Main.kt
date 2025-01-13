@@ -150,8 +150,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                         position = exitPos,
                         Case(
                             idea = CaseIdea.EXIT,
-                            direction = Direction.LEFT,
-                            haveToBuildElevator = false,
+                            action = CaseAction(
+                                direction = Direction.LEFT,
+                                buildElevator = false,
+                            ),
                             constraints = StateConstraints(
                                 roundsLeft = 0,
                                 elevatorsLeft = 0,
@@ -160,8 +162,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                         ),
                         Case(
                             idea = CaseIdea.EXIT,
-                            direction = Direction.RIGHT,
-                            haveToBuildElevator = false,
+                            action = CaseAction(
+                                direction = Direction.RIGHT,
+                                buildElevator = false,
+                            ),
                             constraints = StateConstraints(
                                 roundsLeft = 0,
                                 elevatorsLeft = 0,
@@ -182,8 +186,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 // надо ещё и развернуться - заблокировав одного клона из резерва
                                 Case(
                                     idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
-                                    direction = Direction.LEFT,
-                                    haveToBuildElevator = false,
+                                    action = CaseAction(
+                                        direction = Direction.LEFT,
+                                        buildElevator = false,
+                                    ),
                                     constraints = StateConstraints(
                                         roundsLeft = exitPos - position + 1,
                                         elevatorsLeft = 0,
@@ -194,8 +200,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 // пробежать расстояние до выхода без расходования клонов
                                 Case(
                                     idea = CaseIdea.JUST_RUN_TO_EXIT,
-                                    direction = Direction.RIGHT,
-                                    haveToBuildElevator = false,
+                                    action = CaseAction(
+                                        direction = Direction.RIGHT,
+                                        buildElevator = false,
+                                    ),
                                     constraints = StateConstraints(
                                         roundsLeft = exitPos - position,
                                         elevatorsLeft = 0,
@@ -217,8 +225,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 // надо ещё и развернуться - заблокировав одного клона из резерва
                                 Case(
                                     idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
-                                    direction = Direction.RIGHT,
-                                    haveToBuildElevator = false,
+                                    action = CaseAction(
+                                        direction = Direction.RIGHT,
+                                        buildElevator = false,
+                                    ),
                                     constraints = StateConstraints(
                                         roundsLeft = position - exitPos + 1,
                                         elevatorsLeft = 0,
@@ -229,8 +239,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 // пробежать расстояние до выхода без расходования клонов
                                 Case(
                                     idea = CaseIdea.JUST_RUN_TO_EXIT,
-                                    direction = Direction.LEFT,
-                                    haveToBuildElevator = false,
+                                    action = CaseAction(
+                                        direction = Direction.LEFT,
+                                        buildElevator = false,
+                                    ),
                                     constraints = StateConstraints(
                                         roundsLeft = position - exitPos,
                                         elevatorsLeft = 0,
@@ -276,6 +288,9 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                                     // на подъём на лифте, а дополнительные ресурсы не нужны
                                                     constraints = it.constraints.copy(roundsLeft = it.constraints.roundsLeft + 1),
                                                     idea = CaseIdea.USE_EXISTING_ELEVATOR,
+                                                    action = it.action.copy(
+                                                        buildElevator = false,
+                                                    ),
                                                 )
                                         }
                                         .also {
@@ -290,7 +305,9 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                         .cases[position]
                                         .map {
                                             it.copy(
-                                                haveToBuildElevator = true,
+                                                action = it.action.copy(
+                                                    buildElevator = true,
+                                                ),
                                                 // построить лифт и подняться на нём
                                                 constraints = it.constraints.copy(
                                                     elevatorsLeft = it.constraints.elevatorsLeft + 1,
@@ -362,14 +379,16 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
 
                                 cases = previousCases
                                     .filter {
-                                        it.direction == Direction.LEFT
+                                        it.action.direction == Direction.LEFT
                                     }
                                     .flatMap {
                                         listOf(
                                             // просто бежим налево к предыдущим кейсам
                                             it.copy(
-                                                direction = Direction.LEFT,
-                                                haveToBuildElevator = false,
+                                                action = CaseAction(
+                                                    direction = Direction.LEFT,
+                                                    buildElevator = false,
+                                                ),
                                                 idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                 // движение к предыдущему кейсу
                                                 constraints = it.constraints.copy(
@@ -378,8 +397,10 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                             ),
                                             // разворачиваемся и бежим налево к предыдущим кейсам
                                             it.copy(
-                                                direction = Direction.RIGHT,
-                                                haveToBuildElevator = false,
+                                                action = CaseAction(
+                                                    direction = Direction.RIGHT,
+                                                    buildElevator = false,
+                                                ),
                                                 // блок и движение к предыдущему кейсу
                                                 constraints = it.constraints.copy(
                                                     clonesLeft = it.constraints.clonesLeft + 1,
@@ -446,21 +467,25 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                                 position = currentPosition,
                                 cases = previousCases
                                     .filter {
-                                        it.direction == Direction.RIGHT
+                                        it.action.direction == Direction.RIGHT
                                     }
                                     .flatMap {
                                         listOf(
                                             it.copy(
-                                                direction = Direction.RIGHT,
-                                                haveToBuildElevator = false,
+                                                action = CaseAction(
+                                                    direction = Direction.RIGHT,
+                                                    buildElevator = false,
+                                                ),
                                                 idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                 constraints = it.constraints.copy(
                                                     roundsLeft = it.constraints.roundsLeft + 1,
                                                 ),
                                             ),
                                             it.copy(
-                                                direction = Direction.LEFT,
-                                                haveToBuildElevator = false,
+                                                action = CaseAction(
+                                                    direction = Direction.LEFT,
+                                                    buildElevator = false,
+                                                ),
                                                 constraints = it.constraints.copy(
                                                     clonesLeft = it.constraints.clonesLeft + 1,
                                                     roundsLeft = it.constraints.roundsLeft + 2,
@@ -564,11 +589,11 @@ fun main(@Suppress("UNUSED_PARAMETER") args: Array<String>) {
                     it.constraints.roundsLeft
                 }
 
-            if (bestCase.haveToBuildElevator) {
+            if (bestCase.action.buildElevator) {
                 buildElevator()
             }
 
-            if (bestCase.direction == direction) {
+            if (bestCase.action.direction == direction) {
                 // клон двигается, как надо
                 doNothingAndWait()
             } else {
@@ -610,14 +635,25 @@ private enum class Direction {
 private enum class CaseIdea(
     val code: String,
 ) {
-    JUST_RUN_TO_EXIT("JRE"),
-    REVERSE_AND_RUN_TO_EXIT("RRE"),
-    EXIT("E"),
-    USE_EXISTING_ELEVATOR("EE"),
-    BUILD_NEW_ELEVATOR("BE"),
-    RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RTL"),
-    REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RRTL"),
+    JUST_RUN_TO_EXIT("JREx"),
+    REVERSE_AND_RUN_TO_EXIT("RREx"),
+    EXIT("Ex"),
+    USE_EXISTING_ELEVATOR("El"),
+    BUILD_NEW_ELEVATOR("BEl"),
+    RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RTEl"),
+    REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RRTEl"),
 }
+
+private data class CaseAction(
+    /**
+     * Направление клона
+     */
+    val direction: Direction,
+    /**
+     * Предполагает обязательную постройку лифта
+     */
+    val buildElevator: Boolean,
+)
 
 /**
  * Вариант дальнейшего движения - с указанием расстояния и требуемых ресурсов
@@ -628,20 +664,16 @@ private data class Case(
      */
     val idea: CaseIdea,
     /**
-     * Направление клона
+     * Указание к действию
      */
-    val direction: Direction,
-    /**
-     * Предполагает обязательную постройку лифта
-     */
-    val haveToBuildElevator: Boolean,
+    val action: CaseAction,
     /**
      * Минимальные условия для использования данного варианта
      */
     val constraints: StateConstraints,
 ) {
     override fun toString(): String {
-        return "${idea.code}:${if (direction == Direction.LEFT) "L" else "R"}${constraints.roundsLeft}${if (haveToBuildElevator) "^" else ""}e${constraints.elevatorsLeft}c${constraints.clonesLeft}"
+        return "${idea.code}:${if (action.direction == Direction.LEFT) "L" else "R"}${constraints.roundsLeft}${if (action.buildElevator) "^" else ""}e${constraints.elevatorsLeft}c${constraints.clonesLeft}"
     }
 
     private fun hasLessStrictAnalogueAmong(
@@ -660,12 +692,11 @@ private data class Case(
          */
         fun List<Case>.optimize(): List<Case> {
             return this
-                .partition {
-                    it.direction == Direction.LEFT
+                .groupBy {
+                    it.action.direction
                 }
-                .toList()
                 .flatMap {
-                    it.optimizeDirection()
+                    it.value.optimizeDirection()
                 }
         }
 
