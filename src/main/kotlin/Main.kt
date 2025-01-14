@@ -2,22 +2,11 @@ import Case.Companion.optimize
 import java.time.Duration
 import java.time.Instant
 import java.util.*
-import kotlin.concurrent.thread
 
 fun main() {
 
     startedAt = Instant.now()
     lastMeasuredAt = startedAt
-
-    fun warmUpJit() {
-        debug("before warmUpJit")
-        Area.buildArea(config = GameConfig.JIT_WARM_UP_CONFIG)
-        debug("after warmUpJit")
-    }
-
-    thread {
-        warmUpJit()
-    }
 
     val input = Scanner(System.`in`)
 
@@ -26,15 +15,23 @@ fun main() {
             input = input,
         )
 
+    debug("config: $config")
     debug("before buildArea")
     val area = Area.buildArea(config = config)
     debug("after buildArea")
+
+    area.floors.reversed().forEach {
+        debug(it)
+    }
 
     var resources = StateConstraints(
         clonesLeft = config.totalClonesNumber,
         elevatorsLeft = config.additionalElevatorsNumber,
         roundsLeft = config.roundsNumber,
     )
+
+    val newElevators = hashSetOf<AreaPoint>()
+    val path = mutableListOf<Case>()
 
     fun finishRound(
         command: Command,
@@ -47,6 +44,11 @@ fun main() {
     }
 
     fun blockClone(): Nothing {
+        path
+            .forEach { case ->
+                case.decrementRequiredClones()
+            }
+
         resources = resources
             .copy(
                 clonesLeft = resources.clonesLeft - 1,
@@ -54,11 +56,15 @@ fun main() {
         finishRound(Command.BLOCK_CLONE)
     }
 
-    val newElevators = hashSetOf<AreaPoint>()
-
     fun buildElevator(
         elevator: AreaPoint,
     ): Nothing {
+
+        path
+            .forEach { case ->
+                case.decrementRequiredElevators()
+            }
+
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
             elevatorsLeft = resources.elevatorsLeft - 1,
@@ -80,7 +86,8 @@ fun main() {
             // direction of the leading clone: LEFT or RIGHT (or NONE)
             val direction = Direction.valueOf(input.next())
 
-            debug("round: $clone, $direction")
+            debug("clone=$clone, $direction")
+            debug("resources=$resources")
 
             fun noClone() = clone.position < 0
 
@@ -98,12 +105,22 @@ fun main() {
             val bestCase = area
                 .getCasesFor(clone)
                 .asSequence()
-                .filter {
-                    resources.satisfies(it.constraints)
+                .filter { case ->
+                    resources.satisfies(case.constraints).also { satisfies ->
+                        debug("$case ${if (satisfies) "+" else "-"}")
+                    }
                 }
-                .minBy {
+                .minByOrNull {
                     it.constraints.roundsLeft
                 }
+
+            if (bestCase == null) {
+                error("no suitable case")
+            }
+
+            debug("bestCase: $bestCase")
+
+            path += bestCase
 
             if (bestCase.action.buildElevator) {
                 buildElevator(
@@ -111,17 +128,20 @@ fun main() {
                 )
             }
 
-            if (bestCase.action.direction == direction) {
-                // клон двигается, как надо
-                doNothingAndWait()
-            } else {
+            if (bestCase.action.direction != direction) {
                 // клон двигается в другом направлении, надо развернуть
                 blockClone()
             }
+
+            // клон двигается, как надо
+            doNothingAndWait()
         } catch (e: FinishRoundException) {
             resources = resources.copy(roundsLeft = resources.roundsLeft - 1)
             debug("round end ${e.command}")
             println(e.command.message)
+        } catch (e: Throwable) {
+            debug("exception ${e.stackTraceToString()}")
+            throw e
         }
     }
 }
@@ -196,7 +216,7 @@ private data class Case(
     /**
      * Минимальные условия для использования данного варианта
      */
-    val constraints: StateConstraints,
+    var constraints: StateConstraints,
 ) {
     override fun toString(): String {
         return "${idea.code}:${if (action.direction == Direction.LEFT) "L" else "R"}${constraints.roundsLeft}${if (action.buildElevator) "^" else ""}e${constraints.elevatorsLeft}c${constraints.clonesLeft}"
@@ -209,6 +229,20 @@ private data class Case(
             .any {
                 it.constraints.isLessStrictAnalogueOf(constraints)
             }
+    }
+
+    fun decrementRequiredClones() {
+        constraints = constraints
+            .copy(
+                clonesLeft = constraints.clonesLeft - 1,
+            )
+    }
+
+    fun decrementRequiredElevators() {
+        constraints = constraints
+            .copy(
+                elevatorsLeft = constraints.elevatorsLeft - 1,
+            )
     }
 
     companion object {
@@ -308,25 +342,56 @@ private data class StateConstraints(
 }
 
 private data class GameConfig(
-    // number of floors in the area. A clone can move between floor 0 and floor floorsNumber - 1
+    /**
+     * number of floors in the area. A clone can move between floor 0 and floor floorsNumber - 1
+     */
     val floorsNumber: Int,
-    // the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+    /**
+     * the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+     */
     val width: Int,
-    // maximum number of rounds before the end of the game
-    // клон может не добежать 1 шаг, так как раунды кончились
-    // так что недостаточно только считать клонов
+    /**
+     * maximum number of rounds before the end of the game
+     * клон может не добежать 1 шаг, так как раунды кончились
+     * так что недостаточно только считать клонов
+     */
     val roundsNumber: Int,
-    // the floor on which the exit is located
+    /**
+     * the floor on which the exit is located
+     */
     val exitFloor: Int,
-    // the position of the exit on its floor
+    /**
+     * the position of the exit on its floor
+     */
     val exitPosition: Int,
-    // the number of clones that will come out of the generator during the game
+    /**
+     * the number of clones that will come out of the generator during the game
+     */
     val totalClonesNumber: Int,
-    // number of additional elevators that you can build
+    /**
+     * number of additional elevators that you can build
+     */
     val additionalElevatorsNumber: Int,
-    // elevators in the area
+    /**
+     * elevators in the area
+     */
     val elevators: Elevators,
+    /**
+     * период выпуска новых клонов
+     */
+    val clonesEmissionPeriod: Int,
 ) {
+    /**
+     * На это время увеличивается число необходимых раундов при расходовании
+     * клона (блокировке или постройке лифта).
+     *
+     * Почему такая формула?
+     * Пусть clonesEmissionPeriod = 1, т. е. клоны бегут друг за другом.
+     * При расходовании клона, следующий клон в этом же раунде попадает на место расходования.
+     * А значит, снова находится на 1 позицию позади места, где был бы первый клон, если бы его не израсходовали.
+     */
+    val cloneCostInRounds = clonesEmissionPeriod
+
     /**
      * Количество этажей, с которыми имеет смысл работать.
      * Более верхние этажи можно отбросить, так как с них невозможно добраться до выхода
@@ -335,23 +400,6 @@ private data class GameConfig(
     val workFloorsNumber = exitFloor + 1
 
     companion object {
-        val JIT_WARM_UP_CONFIG: GameConfig get() {
-            return GameConfig(
-                floorsNumber = 3,
-                width = 3,
-                roundsNumber = 100,
-                exitFloor = 1,
-                exitPosition = 1,
-                totalClonesNumber = 100,
-                additionalElevatorsNumber = 1,
-                elevators = Elevators(3).apply {
-                    registerElevator(elevator = AreaPoint(floor = 0, position = 1))
-                    registerElevator(elevator = AreaPoint(floor = 1, position = 1))
-                    registerElevator(elevator = AreaPoint(floor = 2, position = 1))
-                },
-            )
-        }
-
         fun readFromStdIn(
             input: Scanner,
         ): GameConfig {
@@ -389,8 +437,11 @@ private data class GameConfig(
                 totalClonesNumber = input.nextInt(),
                 additionalElevatorsNumber = input.nextInt(),
                 elevators = readElevators(floorsNumber),
+                clonesEmissionPeriod = CLONES_EMISSION_PERIOD,
             )
         }
+
+        private const val CLONES_EMISSION_PERIOD = 3
     }
 }
 
@@ -412,6 +463,17 @@ private class Elevators(
         position: Int,
     ): Boolean {
         return position in elevators[floorIndex]
+    }
+
+    override fun toString(): String {
+        return elevators
+            .withIndex()
+            .filter {
+                it.value.isNotEmpty()
+            }
+            .joinToString(separator = "; ") {
+                "${it.index}:${it.value.sorted()}"
+            }
     }
 }
 
@@ -548,7 +610,7 @@ private class Area(
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
-                                                roundsLeft = config.exitPosition - position + 1,
+                                                roundsLeft = config.exitPosition - position + config.cloneCostInRounds,
                                                 elevatorsLeft = 0,
                                                 clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
                                             ),
@@ -589,7 +651,7 @@ private class Area(
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
-                                                roundsLeft = position - config.exitPosition + 1,
+                                                roundsLeft = position - config.exitPosition + config.cloneCostInRounds,
                                                 elevatorsLeft = 0,
                                                 clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
                                             ),
@@ -668,16 +730,16 @@ private class Area(
                                             position = position,
                                             newCases = upperFloor
                                                 .cases[position]
-                                                .map {
-                                                    it.copy(
-                                                        action = it.action.copy(
+                                                .map { upperFloorCase ->
+                                                    upperFloorCase.copy(
+                                                        action = upperFloorCase.action.copy(
                                                             buildElevator = true,
                                                         ),
                                                         // построить лифт и подняться на нём
-                                                        constraints = it.constraints.copy(
-                                                            elevatorsLeft = it.constraints.elevatorsLeft + 1,
-                                                            clonesLeft = it.constraints.clonesLeft + 1,
-                                                            roundsLeft = it.constraints.roundsLeft + 2,
+                                                        constraints = upperFloorCase.constraints.copy(
+                                                            elevatorsLeft = upperFloorCase.constraints.elevatorsLeft + 1,
+                                                            clonesLeft = upperFloorCase.constraints.clonesLeft + 1,
+                                                            roundsLeft = upperFloorCase.constraints.roundsLeft + 1 + config.cloneCostInRounds,
                                                         ),
                                                         idea = CaseIdea.BUILD_NEW_ELEVATOR,
                                                     )
@@ -771,7 +833,7 @@ private class Area(
                                                         // блок и движение к предыдущему кейсу
                                                         constraints = it.constraints.copy(
                                                             clonesLeft = it.constraints.clonesLeft + 1,
-                                                            roundsLeft = it.constraints.roundsLeft + 2,
+                                                            roundsLeft = it.constraints.roundsLeft + config.cloneCostInRounds,
                                                         ),
                                                         idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                     ),
@@ -857,7 +919,7 @@ private class Area(
                                                         ),
                                                         constraints = it.constraints.copy(
                                                             clonesLeft = it.constraints.clonesLeft + 1,
-                                                            roundsLeft = it.constraints.roundsLeft + 2,
+                                                            roundsLeft = it.constraints.roundsLeft + config.cloneCostInRounds,
                                                         ),
                                                         idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                     ),
