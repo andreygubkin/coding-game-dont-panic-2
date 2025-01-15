@@ -17,8 +17,18 @@ fun main() {
 
     debug("config: $config")
 
+    var resources = StateConstraints(
+        clonesLeft = config.totalClonesNumber,
+        elevatorsLeft = config.additionalElevatorsNumber,
+        roundsLeft = config.roundsNumber,
+    )
+
+    debug("resources = $resources")
+
     val area = Area
-        .buildArea(config = config)
+        .buildArea(
+            config = config,
+        )
 
     @Suppress("unused")
     fun debugArea() {
@@ -38,16 +48,11 @@ fun main() {
                     .forEach {
                         debug(it)
                     }
+                //debug(floor)
             }
     }
 
     debugArea()
-
-    var resources = StateConstraints(
-        clonesLeft = config.totalClonesNumber,
-        elevatorsLeft = config.additionalElevatorsNumber,
-        roundsLeft = config.roundsNumber,
-    )
 
     val newElevators = hashSetOf<AreaPoint>()
     val path = Path()
@@ -120,6 +125,10 @@ fun main() {
                 doNothingAndWait()
             }
 
+            if (clone in path) {
+                doNothingAndWait()
+            }
+
             val isElevator = area.isElevator(clone) || clone in newElevators
 
             // ждём подъёма на лифте
@@ -132,7 +141,7 @@ fun main() {
                 .getCasesFor(clone)
                 .filter { case ->
                     resources
-                        .satisfies(
+                        .isEnoughFor(
                             constraints = case.constraints,
                         )
                         .also { satisfies ->
@@ -152,6 +161,9 @@ fun main() {
 
             // решение - сразу вычислить путь
             // и команды делать в зависимости от положения на пути
+
+            // или если клон пока на уже проложенном пути, то ничего не делать
+            // и можно не пересчитывать веса
 
             requireNotNull(bestCase) {
                 "no suitable case found"
@@ -345,8 +357,10 @@ private data class Case(
                 .groupBy {
                     it.action.direction
                 }
-                .flatMap {
-                    it.value.optimizeDirection()
+                .flatMap { entry ->
+                    entry
+                        .value
+                        .optimizeDirection()
                 }
         }
 
@@ -394,7 +408,7 @@ private data class StateConstraints(
      */
     val roundsLeft: Int,
 ) {
-    fun satisfies(
+    fun isEnoughFor(
         constraints: StateConstraints,
     ): Boolean {
         val resources = this
@@ -598,8 +612,10 @@ private class Floor(
 
     fun optimizeCases() {
         floorCases = floorCases
-            .map {
-                it.optimize().toMutableList()
+            .map { positionCases ->
+                positionCases
+                    .optimize()
+                    .toMutableList()
             }
     }
 
@@ -1112,6 +1128,14 @@ private class Path {
     ) {
         if (cases.none { it === case }) {
             cases += case
+        }
+    }
+
+    operator fun contains(
+        point: AreaPoint,
+    ): Boolean {
+        return cases.any {
+            it.floorIndex == point.floor && it.floorPosition == point.position
         }
     }
 }
