@@ -20,12 +20,13 @@ fun main() {
     val area = Area
         .buildArea(config = config)
 
+    @Suppress("unused")
     fun debugArea() {
         debug("Area:")
         area
             .floors
             .filter {
-                it.floorIndex in 6..8
+                it.floorIndex in 0..0
             }
             .reversed()
             .forEach { floor ->
@@ -39,7 +40,7 @@ fun main() {
     }
 
     debug("area is ready")
-    debugArea()
+    //debugArea()
 
     var resources = StateConstraints(
         clonesLeft = config.totalClonesNumber,
@@ -48,11 +49,21 @@ fun main() {
     )
 
     val newElevators = hashSetOf<AreaPoint>()
-    val path = mutableListOf<Case>()
+    val path = Path()
+
+    fun debugPath() {
+        debug(path)
+    }
 
     fun finishRound(
         command: Command,
     ): Nothing {
+        resources = resources.copy(
+            roundsLeft = resources.roundsLeft - 1,
+        )
+
+        path.decrementRequiredRounds()
+
         throw FinishRoundException(command)
     }
 
@@ -61,12 +72,8 @@ fun main() {
     }
 
     fun blockClone(): Nothing {
-        path
-            .forEach { case ->
-                case.decrementRequiredClones()
-            }
-
-        debugArea()
+        path.decrementRequiredClones()
+        debugPath()
 
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
@@ -78,12 +85,9 @@ fun main() {
         elevator: AreaPoint,
     ): Nothing {
 
-        path
-            .forEach { case ->
-                case.decrementRequiredElevators()
-            }
+        path.decrementRequiredElevators()
 
-        debugArea()
+        debugPath()
 
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
@@ -122,16 +126,16 @@ fun main() {
                 doNothingAndWait()
             }
 
+            debug("Position cases:")
             val bestCase = area
                 .getCasesFor(clone)
-                .asSequence()
                 .filter { case ->
                     resources
                         .satisfies(
                             constraints = case.constraints,
                         )
                         .also { satisfies ->
-                            debug("$case ${if (satisfies) "+" else "-"}")
+                            debug("\t$case ${if (satisfies) "+" else "-"}")
                         }
                 }
                 .minByOrNull {
@@ -145,6 +149,7 @@ fun main() {
             debug("bestCase: $bestCase")
 
             path += bestCase
+            debugPath()
 
             if (bestCase.action.buildElevator) {
                 buildElevator(
@@ -161,9 +166,6 @@ fun main() {
             doNothingAndWait()
 
         } catch (e: FinishRoundException) {
-            resources = resources.copy(
-                roundsLeft = resources.roundsLeft - 1,
-            )
             debug("round end ${e.command}")
             println(e.command.message)
         } catch (e: Throwable) {
@@ -185,7 +187,7 @@ private fun debug(
     if (!DEBUG_MODE) {
         return
     }
-    val debugOutput =  if (!DEBUG_OUTPUT_TIME) {
+    val debugOutput = if (!DEBUG_OUTPUT_TIME) {
         message
     } else {
         val now = Instant.now()
@@ -276,8 +278,18 @@ private data class Case(
                 "$constraints" +
                 (targetCase
                     ?.let {
-                        "[${it.floorPosition}@${it.floorIndex}:${it.copy(targetCase = null)}]"
-                    } ?: "")
+                        "[${it.copy(targetCase = null).description()}]"
+                    } ?: "") +
+                (additionalActions
+                    .takeIf {
+                        it.isNotEmpty()
+                    }
+                    ?.joinToString(prefix = "{", postfix = "}", separator = ",")
+                    ?: "")
+    }
+
+    fun description(): String {
+        return "$floorIndex/$floorPosition:$this"
     }
 
     private fun hasLessStrictAnalogueAmong(
@@ -289,16 +301,27 @@ private data class Case(
             }
     }
 
+    private val additionalActions = mutableListOf<String>()
+
+    fun decrementRequiredRounds() {
+        constraints = constraints.copy(
+            roundsLeft = constraints.roundsLeft - 1,
+        )
+        additionalActions += "r--"
+    }
+
     fun decrementRequiredClones() {
         constraints = constraints.copy(
             clonesLeft = constraints.clonesLeft - 1,
         )
+        additionalActions += "c--"
     }
 
     fun decrementRequiredElevators() {
         constraints = constraints.copy(
             elevatorsLeft = constraints.elevatorsLeft - 1,
         )
+        additionalActions += "e--"
     }
 
     companion object {
@@ -1042,6 +1065,42 @@ private class Area(
                     .toList()
                     .reversed()
             )
+        }
+    }
+}
+
+private class Path {
+    private val cases = mutableListOf<Case>()
+
+    fun decrementRequiredRounds() {
+        cases.forEach { case ->
+            case.decrementRequiredRounds()
+        }
+    }
+
+    fun decrementRequiredClones() {
+        cases.forEach { case ->
+            case.decrementRequiredClones()
+        }
+    }
+
+    fun decrementRequiredElevators() {
+        cases.forEach { case ->
+            case.decrementRequiredElevators()
+        }
+    }
+
+    override fun toString(): String {
+        return cases.joinToString(prefix = "Path: ", separator = "  -->>  ") {
+            it.description()
+        }
+    }
+
+    operator fun plusAssign(
+        case: Case,
+    ) {
+        if (cases.none { it === case }) {
+            cases += case
         }
     }
 }
