@@ -33,14 +33,15 @@ fun main() {
                 floor
                     .toString()
                     .lines()
+                    .drop(5)
+                    .take(3)
                     .forEach {
                         debug(it)
                     }
             }
     }
 
-    debug("area is ready")
-    //debugArea()
+    debugArea()
 
     var resources = StateConstraints(
         clonesLeft = config.totalClonesNumber,
@@ -110,8 +111,8 @@ fun main() {
             // direction of the leading clone: LEFT or RIGHT (or NONE)
             val direction = Direction.valueOf(input.next())
 
-            debug("clone=$clone, $direction")
-            debug("resources=$resources")
+            debug("clone = $clone, $direction")
+            debug("resources = $resources")
 
             fun noClone() = clone.position < 0
 
@@ -141,6 +142,13 @@ fun main() {
                 .minByOrNull {
                     it.constraints.roundsLeft
                 }
+
+            //TODO: на карте ресурсы посчитаны для первого клона
+            // следующие бегут в уже изменившихся условиях, и надо пересчитать ресурсы
+            // построенные лифты могут быть посчитаны как новые лифты и карта пересчитана
+            // как учесть поставленные блоки?
+            // как только второй клон добегает до ячейки после блока, ему уже не хватает ресурсов, так как прошло 3 раунда
+            // и один клон потрачен, хотя первому клону ресурсов хватало, чтобы зайти на эту ячейку и поставить блок
 
             requireNotNull(bestCase) {
                 "no suitable case found"
@@ -602,9 +610,9 @@ private class Floor(
     override fun toString(): String {
         return "Floor #$floorIndex:\n${
             cases
-                .mapIndexed { index, cases -> index to cases }
+                .withIndex()
                 .joinToString("\n") {
-                    "\t${it.first}: ${it.second.joinToString(", ")}"
+                    "\t${it.index}: ${it.value.joinToString(", ")}"
                 }
         }"
     }
