@@ -180,6 +180,18 @@ fun main() {
             debug("Position cases:")
             val bestCase = area
                 .getCasesFor(clone)
+                .map { case ->
+                    if (case.action.direction == direction) {
+                        case
+                    } else {
+                        case.copy(
+                            constraints = case.constraints.copy(
+                                clonesLeft = case.constraints.clonesLeft + 1,
+                                roundsLeft = case.constraints.roundsLeft + config.cloneCostInRounds,
+                            ),
+                        )
+                    }
+                }
                 .filter { case ->
                     resources
                         .isEnoughFor(
@@ -1212,11 +1224,12 @@ private data class Area(
                         }
                 }
                     .take(config.workFloorsNumber)
-                    .map {
-                        it.withChangedCases {
-                            it.filter {
+                    .map { floor ->
+                        floor.withChangedCases { cases ->
+                            cases.filter {
                                 true
-                                //it.constraints.elevatorsLeft == 0
+                                // TODO: убрать
+                                it.constraints.elevatorsLeft == 0
                             }
                         }
                     }
