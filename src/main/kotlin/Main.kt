@@ -2,6 +2,7 @@ import Case.Companion.optimize
 import java.time.Duration
 import java.time.Instant
 import java.util.*
+import kotlin.collections.LinkedHashSet
 
 fun main() {
 
@@ -37,14 +38,15 @@ fun main() {
             .floors
             .filter {
                 it.floorIndex in 0..0
+                true
             }
             .reversed()
             .forEach { floor ->
                 floor
                     .toString()
                     .lines()
-                    .drop(5)
-                    .take(3)
+                    //.drop(5)
+                    //.take(3)
                     .forEach {
                         debug(it)
                     }
@@ -54,7 +56,9 @@ fun main() {
 
     debugArea()
 
+    // перенести внутрь Area
     val newElevators = hashSetOf<AreaPoint>()
+
     val path = Path()
 
     fun debugPath() {
@@ -68,7 +72,7 @@ fun main() {
             roundsLeft = resources.roundsLeft - 1,
         )
 
-        path.decrementRequiredRounds()
+        //area.decrementRequiredRounds(path)
 
         throw FinishRoundException(command)
     }
@@ -78,27 +82,24 @@ fun main() {
     }
 
     fun blockClone(): Nothing {
-        path.decrementRequiredClones()
-        debugPath()
-
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
         )
+        area.decrementRequiredClones(path)
+
         finishRound(Command.BLOCK_CLONE)
     }
 
     fun buildElevator(
         elevator: AreaPoint,
     ): Nothing {
-
-        path.decrementRequiredElevators()
-
-        debugPath()
-
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
             elevatorsLeft = resources.elevatorsLeft - 1,
         )
+        area.decrementRequiredElevators(path)
+        area.decrementRequiredClones(path)
+
         newElevators += elevator
         finishRound(Command.BUILD_ELEVATOR)
     }
@@ -171,7 +172,7 @@ fun main() {
 
             debug("bestCase: $bestCase")
 
-            path += bestCase
+            path += clone
             debugPath()
 
             if (bestCase.action.buildElevator) {
@@ -270,13 +271,9 @@ private data class CaseAction(
  */
 private data class Case(
     /**
-     * Номер этажа
+     * Позиция в зоне, для которой вычислен данный кейс
      */
-    val floorIndex: Int,
-    /**
-     * Позиция на этаже
-     */
-    val floorPosition: Int,
+    val point: AreaPoint,
     /**
      * Идея кейса
      */
@@ -312,7 +309,7 @@ private data class Case(
     }
 
     fun description(): String {
-        return "$floorIndex/$floorPosition:$this"
+        return "$point:$this"
     }
 
     private fun hasLessStrictAnalogueAmong(
@@ -330,21 +327,21 @@ private data class Case(
         constraints = constraints.copy(
             roundsLeft = constraints.roundsLeft - 1,
         )
-        additionalActions += "r--"
+        additionalActions += "r-"
     }
 
     fun decrementRequiredClones() {
         constraints = constraints.copy(
             clonesLeft = constraints.clonesLeft - 1,
         )
-        additionalActions += "c--"
+        additionalActions += "c-"
     }
 
     fun decrementRequiredElevators() {
         constraints = constraints.copy(
             elevatorsLeft = constraints.elevatorsLeft - 1,
         )
-        additionalActions += "e--"
+        additionalActions += "e-"
     }
 
     companion object {
@@ -598,12 +595,25 @@ private class Elevators(
 private data class AreaPoint(
     val floor: Int,
     val position: Int,
-)
+) {
+    override fun toString(): String {
+        return "$floor/$position"
+    }
+}
 
 private class Floor(
     val floorIndex: Int,
     val width: Int,
 ) {
+    fun floorPointAt(
+        position: Int,
+    ): AreaPoint {
+        return AreaPoint(
+            floor = floorIndex,
+            position = position,
+        )
+    }
+
     private var floorCases: List<MutableList<Case>> = List(size = width) {
         mutableListOf()
     }
@@ -641,8 +651,49 @@ private class Area(
     val floors: List<Floor>,
     val elevators: Elevators,
 ) {
+    private fun Path.process(
+        block: (Case) -> Unit,
+    ) {
+        val cases = getCasesFor(this)
+        cases.forEach(block)
+    }
+
+    fun decrementRequiredRounds(
+        path: Path,
+    ) {
+        path.process { case ->
+            case.decrementRequiredRounds()
+        }
+    }
+
+    fun decrementRequiredClones(
+        path: Path,
+    ) {
+        path.process { case ->
+            case.decrementRequiredClones()
+        }
+    }
+
+    fun decrementRequiredElevators(
+        path: Path,
+    ) {
+        path.process { case ->
+            case.decrementRequiredElevators()
+        }
+    }
+
     override fun toString(): String {
         return "Area:\n${floors.reversed().joinToString("\n")}"
+    }
+
+    fun getCasesFor(
+        path: Path,
+    ): List<Case> {
+        return path
+            .points
+            .flatMap {
+                getCasesFor(it)
+            }
     }
 
     fun getCasesFor(
@@ -684,8 +735,7 @@ private class Area(
                             position = config.exitPosition,
                             newCases = listOf(
                                 Case(
-                                    floorIndex = floorIndex,
-                                    floorPosition = config.exitPosition,
+                                    point = floorPointAt(config.exitPosition),
                                     idea = CaseIdea.EXIT,
                                     action = CaseAction(
                                         direction = Direction.LEFT,
@@ -698,8 +748,7 @@ private class Area(
                                     ),
                                 ),
                                 Case(
-                                    floorIndex = floorIndex,
-                                    floorPosition = config.exitPosition,
+                                    point = floorPointAt(config.exitPosition),
                                     idea = CaseIdea.EXIT,
                                     action = CaseAction(
                                         direction = Direction.RIGHT,
@@ -716,7 +765,7 @@ private class Area(
 
                         (config.exitPosition - 1 downTo 0)
                             .takeWhile { position ->
-                                !AreaPoint(floor = floorIndex, position = position).isElevator()
+                                !floorPointAt(position).isElevator()
                             }
                             .forEach { position ->
                                 // так как этаж с выходом, то не нужен запас лифтов
@@ -726,8 +775,7 @@ private class Area(
                                     // надо ещё и развернуться - заблокировав одного клона из резерва
                                     newCases = listOf(
                                         Case(
-                                            floorIndex = floorIndex,
-                                            floorPosition = position,
+                                            point = floorPointAt(position),
                                             idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
                                             action = CaseAction(
                                                 direction = Direction.LEFT,
@@ -742,8 +790,7 @@ private class Area(
                                         // если клон бежит вправо и выход справа, то нужно только
                                         // пробежать расстояние до выхода без расходования клонов
                                         Case(
-                                            floorIndex = floorIndex,
-                                            floorPosition = position,
+                                            point = floorPointAt(position),
                                             idea = CaseIdea.JUST_RUN_TO_EXIT,
                                             action = CaseAction(
                                                 direction = Direction.RIGHT,
@@ -761,7 +808,7 @@ private class Area(
 
                         (config.exitPosition + 1 until width)
                             .takeWhile { position ->
-                                !AreaPoint(floor = floorIndex, position = position).isElevator()
+                                !floorPointAt(position).isElevator()
                             }
                             .forEach { position ->
                                 // так как этаж с выходом, то не нужен запас лифтов
@@ -771,8 +818,7 @@ private class Area(
                                     // надо ещё и развернуться - заблокировав одного клона из резерва
                                     newCases = listOf(
                                         Case(
-                                            floorIndex = floorIndex,
-                                            floorPosition = position,
+                                            point = floorPointAt(position),
                                             idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
                                             action = CaseAction(
                                                 direction = Direction.RIGHT,
@@ -787,8 +833,7 @@ private class Area(
                                         // если клон бежит влево и выход слева, то нужно только
                                         // пробежать расстояние до выхода без расходования клонов
                                         Case(
-                                            floorIndex = floorIndex,
-                                            floorPosition = position,
+                                            point = floorPointAt(position),
                                             idea = CaseIdea.JUST_RUN_TO_EXIT,
                                             action = CaseAction(
                                                 direction = Direction.LEFT,
@@ -839,8 +884,7 @@ private class Area(
                                                 .cases[position]
                                                 .map { upperFloorCase ->
                                                     upperFloorCase.copy(
-                                                        floorIndex = floorIndex,
-                                                        floorPosition = position,
+                                                        point = floorPointAt(position),
                                                         // так как лифт уже есть, то добавляется раунд
                                                         // на подъём на лифте, а дополнительные ресурсы не нужны
                                                         constraints = upperFloorCase.constraints.copy(
@@ -865,8 +909,7 @@ private class Area(
                                                 .cases[position]
                                                 .map { upperFloorCase ->
                                                     upperFloorCase.copy(
-                                                        floorIndex = floorIndex,
-                                                        floorPosition = position,
+                                                        point = floorPointAt(position),
                                                         action = upperFloorCase.action.copy(
                                                             buildElevator = true,
                                                         ),
@@ -950,8 +993,7 @@ private class Area(
                                                 listOf(
                                                     // просто бежим налево к предыдущим кейсам
                                                     caseFromLeftNeighbourPosition.copy(
-                                                        floorIndex = floorIndex,
-                                                        floorPosition = currentPosition,
+                                                        point = floorPointAt(currentPosition),
                                                         action = CaseAction(
                                                             direction = Direction.LEFT,
                                                             buildElevator = false,
@@ -965,8 +1007,7 @@ private class Area(
                                                     ),
                                                     // разворачиваемся и бежим налево к предыдущим кейсам
                                                     caseFromLeftNeighbourPosition.copy(
-                                                        floorIndex = floorIndex,
-                                                        floorPosition = currentPosition,
+                                                        point = floorPointAt(currentPosition),
                                                         action = CaseAction(
                                                             direction = Direction.RIGHT,
                                                             buildElevator = false,
@@ -1045,8 +1086,7 @@ private class Area(
                                             .flatMap { caseFromRightNeighbourPosition ->
                                                 listOf(
                                                     caseFromRightNeighbourPosition.copy(
-                                                        floorIndex = floorIndex,
-                                                        floorPosition = currentPosition,
+                                                        point = floorPointAt(currentPosition),
                                                         action = CaseAction(
                                                             direction = Direction.RIGHT,
                                                             buildElevator = false,
@@ -1058,8 +1098,7 @@ private class Area(
                                                         targetCase = caseFromRightNeighbourPosition,
                                                     ),
                                                     caseFromRightNeighbourPosition.copy(
-                                                        floorIndex = floorIndex,
-                                                        floorPosition = currentPosition,
+                                                        point = floorPointAt(currentPosition),
                                                         action = CaseAction(
                                                             direction = Direction.LEFT,
                                                             buildElevator = false,
@@ -1097,45 +1136,21 @@ private class Area(
 }
 
 private class Path {
-    private val cases = mutableListOf<Case>()
-
-    fun decrementRequiredRounds() {
-        cases.forEach { case ->
-            case.decrementRequiredRounds()
-        }
-    }
-
-    fun decrementRequiredClones() {
-        cases.forEach { case ->
-            case.decrementRequiredClones()
-        }
-    }
-
-    fun decrementRequiredElevators() {
-        cases.forEach { case ->
-            case.decrementRequiredElevators()
-        }
-    }
+    val points = LinkedHashSet<AreaPoint>()
 
     override fun toString(): String {
-        return cases.joinToString(prefix = "Path: ", separator = "  -->>  ") {
-            it.description()
-        }
+        return points.joinToString(prefix = "Path: ", separator = " -> ")
     }
 
     operator fun plusAssign(
-        case: Case,
+        point: AreaPoint,
     ) {
-        if (cases.none { it === case }) {
-            cases += case
-        }
+        points += point
     }
 
     operator fun contains(
         point: AreaPoint,
     ): Boolean {
-        return cases.any {
-            it.floorIndex == point.floor && it.floorPosition == point.position
-        }
+        return point in points
     }
 }
