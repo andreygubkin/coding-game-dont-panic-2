@@ -15,6 +15,12 @@ fun main() {
         .readFromStdIn(
             input = input,
         )
+        .let {
+            it.copy(
+                //roundsNumber = it.roundsNumber + 1,
+                //roundsNumber = 14,
+            )
+        }
 
     debug("config: $config")
 
@@ -33,20 +39,21 @@ fun main() {
 
     @Suppress("unused")
     fun debugArea() {
+        return
         debug("Area:")
         area
             .floors
             .filter {
                 it.floorIndex in 0..0
-                true
+                //true
             }
             .reversed()
             .forEach { floor ->
                 floor
                     .toString()
                     .lines()
-                    //.drop(5)
-                    //.take(3)
+                    .drop(5)
+                    .take(3)
                     .forEach {
                         debug(it)
                     }
@@ -77,8 +84,20 @@ fun main() {
         throw FinishRoundException(command)
     }
 
-    fun doNothingAndWait(): Nothing {
-        finishRound(Command.DO_NOTHING)
+    fun waitForNewClone(): Nothing {
+        finishRound(Command.WAIT_FOR_NEW_CLONE)
+    }
+
+    fun keepGoing(): Nothing {
+        finishRound(Command.KEEP_GOING)
+    }
+
+    fun useExit(): Nothing {
+        finishRound(Command.USE_EXIT)
+    }
+
+    fun useElevator(): Nothing {
+        finishRound(Command.USE_ELEVATOR)
     }
 
     fun blockClone(): Nothing {
@@ -123,18 +142,25 @@ fun main() {
             fun noClone() = clone.position < 0
 
             if (noClone()) {
-                doNothingAndWait()
+                waitForNewClone()
             }
 
             if (clone in path) {
-                doNothingAndWait()
+                keepGoing()
+            }
+
+            path += clone
+
+            // выходим
+            if (area.isExit(clone)) {
+                useExit()
             }
 
             val isElevator = area.isElevator(clone) || clone in newElevators
 
             // ждём подъёма на лифте
             if (isElevator) {
-                doNothingAndWait()
+                useElevator()
             }
 
             debug("Position cases:")
@@ -172,7 +198,6 @@ fun main() {
 
             debug("bestCase: $bestCase")
 
-            path += clone
             debugPath()
 
             if (bestCase.action.buildElevator) {
@@ -187,10 +212,11 @@ fun main() {
             }
 
             // клон двигается, как надо
-            doNothingAndWait()
+            keepGoing()
 
         } catch (e: FinishRoundException) {
             debug("round end ${e.command}")
+            debugArea()
             println(e.command.message)
         } catch (e: Throwable) {
             debug("exception ${e.stackTraceToString()}")
@@ -229,7 +255,10 @@ private fun debug(
 private enum class Command(
     val message: String,
 ) {
-    DO_NOTHING(message = "WAIT"),
+    USE_ELEVATOR(message = "WAIT"),
+    USE_EXIT(message = "WAIT"),
+    KEEP_GOING(message = "WAIT"),
+    WAIT_FOR_NEW_CLONE(message = "WAIT"),
     BUILD_ELEVATOR(message = "ELEVATOR"),
     BLOCK_CLONE(message = "BLOCK"),
 }
@@ -451,8 +480,6 @@ private data class GameConfig(
     val width: Int,
     /**
      * maximum number of rounds before the end of the game
-     * клон может не добежать 1 шаг, так как раунды кончились
-     * так что недостаточно только считать клонов
      */
     val roundsNumber: Int,
     /**
@@ -648,8 +675,9 @@ private class Floor(
 }
 
 private class Area(
-    val floors: List<Floor>,
+    val exit: AreaPoint,
     val elevators: Elevators,
+    val floors: List<Floor>,
 ) {
     private fun Path.process(
         block: (Case) -> Unit,
@@ -714,6 +742,12 @@ private class Area(
             )
     }
 
+    fun isExit(
+        point: AreaPoint,
+    ): Boolean {
+        return point == exit
+    }
+
     companion object {
         fun buildArea(
             config: GameConfig,
@@ -731,6 +765,9 @@ private class Area(
                     width = config.width,
                 )
                     .apply {
+
+                        val roundsToExit = 1
+
                         addCases(
                             position = config.exitPosition,
                             newCases = listOf(
@@ -742,7 +779,7 @@ private class Area(
                                         buildElevator = false,
                                     ),
                                     constraints = StateConstraints(
-                                        roundsLeft = 0,
+                                        roundsLeft = roundsToExit,
                                         elevatorsLeft = 0,
                                         clonesLeft = 1, // текущий - кто будет спасён
                                     ),
@@ -755,7 +792,7 @@ private class Area(
                                         buildElevator = false,
                                     ),
                                     constraints = StateConstraints(
-                                        roundsLeft = 0,
+                                        roundsLeft = roundsToExit,
                                         elevatorsLeft = 0,
                                         clonesLeft = 1, // текущий - кто будет спасён
                                     ),
@@ -782,7 +819,7 @@ private class Area(
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
-                                                roundsLeft = config.exitPosition - position + config.cloneCostInRounds,
+                                                roundsLeft = config.exitPosition - position + config.cloneCostInRounds + roundsToExit,
                                                 elevatorsLeft = 0,
                                                 clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
                                             ),
@@ -797,7 +834,7 @@ private class Area(
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
-                                                roundsLeft = config.exitPosition - position,
+                                                roundsLeft = config.exitPosition - position + roundsToExit,
                                                 elevatorsLeft = 0,
                                                 clonesLeft = 1, // текущий - кто будет спасён
                                             ),
@@ -854,6 +891,10 @@ private class Area(
             val exitFloorCases = buildExitFloor()
 
             return Area(
+                exit = AreaPoint(
+                    floor = config.exitFloor,
+                    position = config.exitPosition,
+                ),
                 elevators = elevators,
                 floors = generateSequence(
                     seed = exitFloorCases,
