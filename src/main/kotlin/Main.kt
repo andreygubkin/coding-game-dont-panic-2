@@ -6,6 +6,9 @@ import kotlin.collections.LinkedHashSet
 
 fun main() {
 
+    // TODO: в Best Path надо сначала направо бежать
+    // а не разворачиваться!
+
     startedAt = Instant.now()
     lastMeasuredAt = startedAt
 
@@ -22,7 +25,7 @@ fun main() {
             )
         }
 
-    debug("config: $config")
+    //debug("config: $config")
 
     var resources = StateConstraints(
         clonesLeft = config.totalClonesNumber,
@@ -30,7 +33,7 @@ fun main() {
         roundsLeft = config.roundsNumber,
     )
 
-    debug("resources = $resources")
+    //debug("resources = $resources")
 
     val area = Area
         .buildArea(
@@ -49,13 +52,22 @@ fun main() {
             }
             .reversed()
             .forEach { floor ->
+                val headerLinesCount = 1
+                val fromPosition = 0
+                val toPosition = 7
                 floor
                     .toString()
                     .lines()
-                    .drop(5)
-                    .take(3)
-                    .forEach {
-                        debug(it)
+                    .also {
+                        debug(it.first())
+                        it
+                            .slice(
+                                indices = headerLinesCount + fromPosition
+                                        ..headerLinesCount + toPosition
+                            )
+                            .forEach {
+                                debug(it)
+                            }
                     }
                 //debug(floor)
             }
@@ -69,7 +81,7 @@ fun main() {
     val path = Path()
 
     fun debugPath() {
-        debug(path)
+        //debug(path)
     }
 
     fun finishRound(
@@ -78,8 +90,6 @@ fun main() {
         resources = resources.copy(
             roundsLeft = resources.roundsLeft - 1,
         )
-
-        //area.decrementRequiredRounds(path)
 
         throw FinishRoundException(command)
     }
@@ -103,8 +113,10 @@ fun main() {
     fun blockClone(): Nothing {
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
+            roundsLeft = resources.roundsLeft - 1,
         )
         area.decrementRequiredClones(path)
+        area.decrementRequiredRounds(path)
 
         finishRound(Command.BLOCK_CLONE)
     }
@@ -115,9 +127,11 @@ fun main() {
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
             elevatorsLeft = resources.elevatorsLeft - 1,
+            roundsLeft = resources.roundsLeft - 1,
         )
         area.decrementRequiredElevators(path)
         area.decrementRequiredClones(path)
+        area.decrementRequiredRounds(path)
 
         newElevators += elevator
         finishRound(Command.BUILD_ELEVATOR)
@@ -641,6 +655,31 @@ private class Floor(
         )
     }
 
+    fun withChangedCases(
+        block: (List<Case>) -> List<Case>,
+    ): Floor {
+        val originalFloor = this
+
+        val newFloor = Floor(
+            floorIndex = floorIndex,
+            width = width,
+        )
+
+        return newFloor
+            .apply {
+                originalFloor
+                    .floorCases
+                    .withIndex()
+                    .forEach {
+                        newFloor
+                            .addCases(
+                                position = it.index,
+                                newCases = block(it.value),
+                            )
+                    }
+            }
+    }
+
     private var floorCases: List<MutableList<Case>> = List(size = width) {
         mutableListOf()
     }
@@ -674,7 +713,7 @@ private class Floor(
     }
 }
 
-private class Area(
+private data class Area(
     val exit: AreaPoint,
     val elevators: Elevators,
     val floors: List<Floor>,
@@ -1047,6 +1086,10 @@ private class Area(
                                                         targetCase = caseFromLeftNeighbourPosition,
                                                     ),
                                                     // разворачиваемся и бежим налево к предыдущим кейсам
+
+                                                    // TODO: если бегу вправо, то нельзя просто брать лучший кейс влево
+                                                    // к этому кейсу надо прибавить +1 клон и +3 раунда!!!!
+
                                                     caseFromLeftNeighbourPosition.copy(
                                                         point = floorPointAt(currentPosition),
                                                         action = CaseAction(
@@ -1169,6 +1212,14 @@ private class Area(
                         }
                 }
                     .take(config.workFloorsNumber)
+                    .map {
+                        it.withChangedCases {
+                            it.filter {
+                                true
+                                //it.constraints.elevatorsLeft == 0
+                            }
+                        }
+                    }
                     .toList()
                     .reversed()
             )
