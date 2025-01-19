@@ -5,8 +5,8 @@ import java.util.*
 import kotlin.collections.LinkedHashSet
 
 fun main() {
-    startedAt = Instant.now()
-    lastMeasuredAt = startedAt
+
+    val debugger = Debugger()
 
     val input = Scanner(System.`in`)
 
@@ -15,7 +15,7 @@ fun main() {
             input = input,
         )
 
-    //debug("config: $config")
+    //debugger.debug("config: $config")
 
     var resources = StateConstraints(
         clonesLeft = config.totalClonesNumber,
@@ -23,46 +23,14 @@ fun main() {
         roundsLeft = config.roundsNumber,
     )
 
-    //debug("resources = $resources")
+    //debugger.debug("resources = $resources")
 
     val area = Area
         .buildArea(
             config = config,
         )
 
-    @Suppress("unused")
-    fun debugArea() {
-        debug("Area:")
-        area
-            .floors
-            .filter {
-                it.floorIndex in 0..0
-                //true
-            }
-            .reversed()
-            .forEach { floor ->
-                val headerLinesCount = 1
-                val fromPosition = 0
-                val toPosition = 7
-                floor
-                    .toString()
-                    .lines()
-                    .also { lines ->
-                        debug(lines.first())
-                        lines
-                            .slice(
-                                indices = headerLinesCount + fromPosition
-                                        ..headerLinesCount + toPosition
-                            )
-                            .forEach {
-                                debug(it)
-                            }
-                    }
-                //debug(floor)
-            }
-    }
-
-    //debugArea()
+    //debugger.debugArea()
 
     // перенести внутрь Area
     val newElevators = hashSetOf<AreaPoint>()
@@ -129,8 +97,8 @@ fun main() {
             // direction of the leading clone: LEFT or RIGHT (or NONE)
             val direction = Direction.valueOf(input.next())
 
-            debug("clone = $clone, $direction")
-            debug("resources = $resources")
+            //debugger.debug("clone = $clone, $direction")
+            //debugger.debug("resources = $resources")
 
             fun noClone() = clone.position < 0
 
@@ -143,7 +111,6 @@ fun main() {
             }
 
             path += clone
-            //debugPath()
 
             // выходим
             if (area.isExit(clone)) {
@@ -157,7 +124,7 @@ fun main() {
                 useElevator()
             }
 
-            //debug("Position cases:")
+            //debugger.debug("Position cases:")
             val bestCase = area
                 .getCasesFor(clone)
                 .filter {  case ->
@@ -169,7 +136,7 @@ fun main() {
                             constraints = case.constraints,
                         )
                         /*.also { satisfies ->
-                            debug("\t$case ${if (satisfies) "+" else "-"}")
+                            debugger.debug("\t$case ${if (satisfies) "+" else "-"}")
                         }*/
                 }
                 .minByOrNull {
@@ -180,7 +147,7 @@ fun main() {
                 "no suitable case found"
             }
 
-            //debug("bestCase: $bestCase")
+            //debugger.debug("bestCase: $bestCase")
 
             if (bestCase.action.buildElevator) {
                 buildElevator(
@@ -196,38 +163,14 @@ fun main() {
             keepGoing()
 
         } catch (e: FinishRoundException) {
-            //debug("round end ${e.command}")
-            //debugArea()
+            //debugger.debug("round end ${e.command}")
+            //debugger.debugArea()
             println(e.command.message)
         } catch (e: Throwable) {
-            debug("exception ${e.stackTraceToString()}")
+            debugger.debug("exception ${e.stackTraceToString()}")
             throw e
         }
     }
-}
-
-private lateinit var startedAt: Instant
-private lateinit var lastMeasuredAt: Instant
-private const val DEBUG_MODE = false
-private const val DEBUG_OUTPUT_TIME = false
-
-@Suppress("unused")
-private fun debug(
-    message: Any,
-) {
-    if (!DEBUG_MODE) {
-        return
-    }
-    val debugOutput = if (!DEBUG_OUTPUT_TIME) {
-        message
-    } else {
-        val now = Instant.now()
-        val elapsedTimeMs = Duration.between(startedAt, now).toMillis()
-        val elapsedTimeSinceLastMeasureMs = Duration.between(lastMeasuredAt, now).toMillis()
-        lastMeasuredAt = now
-        "$elapsedTimeMs(+$elapsedTimeSinceLastMeasureMs) ms: $message"
-    }
-    System.err.println(debugOutput)
 }
 
 /**
@@ -277,7 +220,7 @@ private data class CaseAction(
 ) {
     init {
         require(!(buildElevator && blockClone)) {
-            "can't block and build elevator simultaneously"
+            "Can't block and build elevator simultaneously"
         }
     }
 }
@@ -1127,5 +1070,68 @@ private class Path {
         point: AreaPoint,
     ): Boolean {
         return point in points
+    }
+}
+
+private class Debugger {
+    private var startedAt: Instant = Instant.now()
+    private var lastMeasuredAt: Instant = startedAt
+
+    @Suppress("unused")
+    fun debugArea(
+        area: Area,
+    ) {
+        debug("Area:")
+        area
+            .floors
+            .filter {
+                it.floorIndex in 0..0
+                //true
+            }
+            .reversed()
+            .forEach { floor ->
+                val headerLinesCount = 1
+                val fromPosition = 0
+                val toPosition = 7
+                floor
+                    .toString()
+                    .lines()
+                    .also { lines ->
+                        debug(lines.first())
+                        lines
+                            .slice(
+                                indices = headerLinesCount + fromPosition
+                                        ..headerLinesCount + toPosition
+                            )
+                            .forEach {
+                                debug(it)
+                            }
+                    }
+                //debug(floor)
+            }
+    }
+
+    @Suppress("unused")
+    fun debug(
+        message: Any,
+    ) {
+        if (!DEBUG_MODE) {
+            return
+        }
+        val debugOutput = if (!DEBUG_OUTPUT_TIME) {
+            message
+        } else {
+            val now = Instant.now()
+            val elapsedTimeMs = Duration.between(startedAt, now).toMillis()
+            val elapsedTimeSinceLastMeasureMs = Duration.between(lastMeasuredAt, now).toMillis()
+            lastMeasuredAt = now
+            "$elapsedTimeMs(+$elapsedTimeSinceLastMeasureMs) ms: $message"
+        }
+        System.err.println(debugOutput)
+    }
+
+    companion object {
+        private const val DEBUG_MODE = false
+        private const val DEBUG_OUTPUT_TIME = false
     }
 }
