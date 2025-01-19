@@ -48,7 +48,6 @@ fun main() {
     fun blockClone(): Nothing {
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
-            // trade-off: расходуем клона ради ускорения по раундам
             roundsLeft = resources.roundsLeft + 1,
         )
 
@@ -61,7 +60,6 @@ fun main() {
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
             elevatorsLeft = resources.elevatorsLeft - 1,
-            // trade-off: расходуем клона ради ускорения по раундам
             roundsLeft = resources.roundsLeft + 1,
         )
 
@@ -77,8 +75,8 @@ fun main() {
     while (true) {
         try {
             val clone = AreaPoint(
-                floor = input.nextInt(), // floor of the leading clone
-                position = input.nextInt(), // position of the leading clone on its floor
+                floor = input.nextInt(),
+                position = input.nextInt(),
             )
 
             val direction = Direction.valueOf(input.next())
@@ -95,19 +93,16 @@ fun main() {
 
             path += clone
 
-            // выходим
             if (clone == area.exit) {
                 useExit()
             }
 
             val isElevator = area.elevators.isElevator(clone)
 
-            // ждём подъёма на лифте
             if (isElevator) {
                 useElevator()
             }
 
-            //debugger.debug("Position cases:")
             val bestCase = area
                 .getCasesFor(
                     point = clone,
@@ -148,9 +143,6 @@ fun main() {
     }
 }
 
-/**
- * Команда, завершающая раунд
- */
 private enum class Command(
     val message: String,
 ) {
@@ -162,77 +154,23 @@ private enum class Command(
     BLOCK_CLONE(message = "BLOCK"),
 }
 
-/**
- * Направление движения клона
- */
 private enum class Direction {
     LEFT,
     RIGHT,
     NONE,
 }
 
-/**
- * Описание идеи, стоящей за кейсом
- */
-private enum class CaseIdea(
-    val code: String,
-) {
-    JUST_RUN_TO_EXIT("JREx"),
-    REVERSE_AND_RUN_TO_EXIT("RREx"),
-    EXIT("Ex"),
-    USE_EXISTING_ELEVATOR("El"),
-    BUILD_NEW_ELEVATOR("BEl"),
-    RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RTEl"),
-    REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RRTEl"),
-}
-
-/**
- * Действие клона на раунде
- */
 private enum class CloneAction {
-    /**
-     * Не расходовать клона - клон двигается в нужном направлении
-     */
     KEEP_GOING,
-
-    /**
-     * Предполагает обязательную постройку лифта
-     */
     BUILD_ELEVATOR,
-
-    /**
-     * Предполагает обязательную блокировку клона
-     */
     BLOCK_CLONE,
 }
 
-/**
- * Вариант дальнейшего движения - с указанием расстояния до выхода и требуемых ресурсов
- */
 private data class Case(
-    /**
-     * Позиция в зоне, для которой вычислен данный кейс
-     */
     val point: AreaPoint,
-    /**
-     * Для какого текущего направления клона этот кейс
-     */
     val direction: Direction,
-    /**
-     * Идея кейса
-     */
-    val idea: CaseIdea,
-    /**
-     * Кейс, к которому бежим
-     */
     val targetCase: Case? = null,
-    /**
-     * Указание к действию
-     */
     val action: CloneAction,
-    /**
-     * Минимальные условия для использования данного варианта
-     */
     var constraints: StateConstraints,
 ) {
     private fun hasLessStrictAnalogueAmong(
@@ -245,10 +183,6 @@ private data class Case(
     }
 
     companion object {
-        /**
-         * Отбросить варианты с более жёсткими ограничениями,
-         * но с теми же или худшими результатами (distance)
-         */
         fun List<Case>.optimize(): List<Case> {
             return this
                 .groupBy {
@@ -261,10 +195,6 @@ private data class Case(
                 }
         }
 
-        /**
-         * Отбросить варианты с более жёсткими ограничениями,
-         * но с теми же или худшими результатами (distance) для однонаправленных кейсов
-         */
         private fun List<Case>.optimizeDirection(): List<Case> {
             val cases = this
 
@@ -292,17 +222,8 @@ private class FinishRoundException(
 ) : Exception()
 
 private data class StateConstraints(
-    /**
-     * Сколько лифтов минимум потребуется построить для достижения выхода
-     */
     val elevatorsLeft: Int,
-    /**
-     * Сколько клонов должно быть в запасе для достижения выхода
-     */
     val clonesLeft: Int,
-    /**
-     * Сколько раундов должно быть в запасе для достижения выхода
-     */
     val roundsLeft: Int,
 ) {
     fun isEnoughFor(
@@ -314,10 +235,6 @@ private data class StateConstraints(
                 && resources.roundsLeft >= constraints.roundsLeft
     }
 
-    /**
-     * Тот же результат при меньших требованиях
-     * или лучше результат при не больших требованиях
-     */
     fun isLessStrictAnalogueOf(
         constraints: StateConstraints,
     ): Boolean {
@@ -337,59 +254,17 @@ private data class StateConstraints(
 }
 
 private data class GameConfig(
-    /**
-     * Number of floors in the area. A clone can move between floor 0 and floor floorsNumber - 1
-     */
     val floorsNumber: Int,
-    /**
-     * The width of the area. The clone can move without being destroyed between position 0 and position width - 1
-     */
     val width: Int,
-    /**
-     * Maximum number of rounds before the end of the game
-     */
     val roundsNumber: Int,
-    /**
-     * The floor on which the exit is located
-     */
     val exitFloor: Int,
-    /**
-     * The position of the exit on its floor
-     */
     val exitPosition: Int,
-    /**
-     * The number of clones that will come out of the generator during the game
-     */
     val totalClonesNumber: Int,
-    /**
-     * Number of additional elevators that you can build
-     */
     val additionalElevatorsNumber: Int,
-    /**
-     * Elevators in the area
-     */
     val elevators: Elevators,
-    /**
-     * Период выпуска новых клонов
-     */
     val clonesEmissionPeriod: Int,
 ) {
-    /**
-     * На это время увеличивается число необходимых раундов при расходовании
-     * клона (блокировке или постройке лифта).
-     *
-     * Почему такая формула?
-     * Пусть clonesEmissionPeriod = 1, т. е. клоны бегут друг за другом.
-     * При расходовании клона, следующий клон в этом же раунде попадает на место расходования.
-     * А значит, снова находится на 1 позицию позади места, где был бы первый клон, если бы его не израсходовали.
-     */
     val cloneCostInRounds = clonesEmissionPeriod
-
-    /**
-     * Количество этажей, с которыми имеет смысл работать.
-     * Более верхние этажи можно отбросить, так как с них невозможно добраться до выхода
-     * и клонов на эти этажи пускать не будем
-     */
     val workFloorsNumber = exitFloor + 1
 
     fun getInitialResource(): StateConstraints {
@@ -418,9 +293,6 @@ private data class GameConfig(
             )
         }
 
-        /**
-         * Периодичность выпуска новых клонов генератором
-         */
         private const val CLONES_EMISSION_PERIOD = 3
     }
 }
@@ -446,11 +318,10 @@ private class Elevators {
         ): Elevators {
             return Elevators()
                 .apply {
-                    // number of elevators in the area
                     val elevatorsNumber = input.nextInt()
                     for (i in 0 until elevatorsNumber) {
-                        val elevatorFloor = input.nextInt() // floor on which this elevator is found
-                        val elevatorPos = input.nextInt() // position of the elevator on its floor
+                        val elevatorFloor = input.nextInt()
+                        val elevatorPos = input.nextInt()
 
                         registerElevator(
                             elevator = AreaPoint(
@@ -543,24 +414,22 @@ private data class Area(
                             newCases = listOf(
                                 Case(
                                     point = floorPointAt(config.exitPosition),
-                                    idea = CaseIdea.EXIT,
                                     direction = Direction.LEFT,
                                     action = CloneAction.KEEP_GOING,
                                     constraints = StateConstraints(
                                         roundsLeft = roundsToExit,
                                         elevatorsLeft = 0,
-                                        clonesLeft = 1, // текущий - кто будет спасён
+                                        clonesLeft = 1,
                                     ),
                                 ),
                                 Case(
                                     point = floorPointAt(config.exitPosition),
-                                    idea = CaseIdea.EXIT,
                                     direction = Direction.RIGHT,
                                     action = CloneAction.KEEP_GOING,
                                     constraints = StateConstraints(
                                         roundsLeft = roundsToExit,
                                         elevatorsLeft = 0,
-                                        clonesLeft = 1, // текущий - кто будет спасён
+                                        clonesLeft = 1,
                                     ),
                                 ),
                             ),
@@ -571,34 +440,27 @@ private data class Area(
                                 !elevators.isElevator(floorPointAt(position))
                             }
                             .forEach { position ->
-                                // так как этаж с выходом, то не нужен запас лифтов
                                 addCases(
                                     position = position,
-                                    // если клон бежит влево, а выход справа, то помимо расстояния до выхода
-                                    // надо ещё и развернуться - заблокировав одного клона из резерва
                                     newCases = listOf(
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
                                             direction = Direction.LEFT,
                                             action = CloneAction.BLOCK_CLONE,
                                             constraints = StateConstraints(
                                                 roundsLeft = config.exitPosition - position + config.cloneCostInRounds + roundsToExit,
                                                 elevatorsLeft = 0,
-                                                clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
+                                                clonesLeft = 2,
                                             ),
                                         ),
-                                        // если клон бежит вправо и выход справа, то нужно только
-                                        // пробежать расстояние до выхода без расходования клонов
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.JUST_RUN_TO_EXIT,
                                             direction = Direction.RIGHT,
                                             action = CloneAction.KEEP_GOING,
                                             constraints = StateConstraints(
                                                 roundsLeft = config.exitPosition - position + roundsToExit,
                                                 elevatorsLeft = 0,
-                                                clonesLeft = 1, // текущий - кто будет спасён
+                                                clonesLeft = 1,
                                             ),
                                         ),
                                     ),
@@ -610,34 +472,27 @@ private data class Area(
                                 !elevators.isElevator(floorPointAt(position))
                             }
                             .forEach { position ->
-                                // так как этаж с выходом, то не нужен запас лифтов
                                 addCases(
                                     position = position,
-                                    // если клон бежит вправо, а выход слева, то помимо расстояния до выхода
-                                    // надо ещё и развернуться - заблокировав одного клона из резерва
                                     newCases = listOf(
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
                                             direction = Direction.RIGHT,
                                             action = CloneAction.BLOCK_CLONE,
                                             constraints = StateConstraints(
                                                 roundsLeft = position - config.exitPosition + config.cloneCostInRounds,
                                                 elevatorsLeft = 0,
-                                                clonesLeft = 2, // текущий - кого заблокируем, и следующий - кто будет спасён
+                                                clonesLeft = 2,
                                             ),
                                         ),
-                                        // если клон бежит влево и выход слева, то нужно только
-                                        // пробежать расстояние до выхода без расходования клонов
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.JUST_RUN_TO_EXIT,
                                             direction = Direction.LEFT,
                                             action = CloneAction.KEEP_GOING,
                                             constraints = StateConstraints(
                                                 roundsLeft = position - config.exitPosition,
                                                 elevatorsLeft = 0,
-                                                clonesLeft = 1, // текущий - кто будет спасён
+                                                clonesLeft = 1,
                                             ),
                                         ),
                                     ),
@@ -678,7 +533,6 @@ private data class Area(
                                         )
 
                                     if (isElevator) {
-                                        // вариант 1: подняться на существующем лифте
                                         addCases(
                                             position = position,
                                             newCases = upperFloor
@@ -686,13 +540,10 @@ private data class Area(
                                                 .map { upperFloorCase ->
                                                     upperFloorCase.copy(
                                                         point = floorPointAt(position),
-                                                        // так как лифт уже есть, то добавляется раунд
-                                                        // на подъём на лифте, а дополнительные ресурсы не нужны
                                                         constraints = upperFloorCase.constraints.copy(
                                                             roundsLeft = upperFloorCase.constraints.roundsLeft + 1,
                                                         ),
                                                         action = CloneAction.KEEP_GOING,
-                                                        idea = CaseIdea.USE_EXISTING_ELEVATOR,
                                                         targetCase = upperFloorCase,
                                                     )
                                                 }
@@ -701,7 +552,6 @@ private data class Area(
                                                 }
                                         )
                                     } else {
-                                        // вариант 2: построить лифт (уменьшив запасы лифтов и клонов = увеличив требуемые запасы)
                                         addCases(
                                             position = position,
                                             newCases = upperFloor
@@ -710,13 +560,11 @@ private data class Area(
                                                     upperFloorCase.copy(
                                                         point = floorPointAt(position),
                                                         action = CloneAction.BUILD_ELEVATOR,
-                                                        // построить лифт и подняться на нём
                                                         constraints = upperFloorCase.constraints.copy(
                                                             elevatorsLeft = upperFloorCase.constraints.elevatorsLeft + 1,
                                                             clonesLeft = upperFloorCase.constraints.clonesLeft + 1,
                                                             roundsLeft = upperFloorCase.constraints.roundsLeft + 1 + config.cloneCostInRounds,
                                                         ),
-                                                        idea = CaseIdea.BUILD_NEW_ELEVATOR,
                                                         targetCase = upperFloorCase,
                                                     )
                                                 }
@@ -733,12 +581,11 @@ private data class Area(
                                 val isElevator: Boolean,
                             )
 
-                            // вариант 3: бежать налево к ближнему лифту или к лучшей возможной точке построения нового лифта
                             val leftMostPosition = 0
                             generateSequence(
                                 HorizontalRunCase(
                                     position = leftMostPosition,
-                                    cases = emptyList(), // с левой позиции бесполезно бежать налево
+                                    cases = emptyList(),
                                     isElevator = config
                                         .elevators
                                         .isElevator(
@@ -764,24 +611,15 @@ private data class Area(
                                 if (isElevator) {
                                     HorizontalRunCase(
                                         position = currentPosition,
-                                        cases = emptyList(), // из лифта налево не убежишь - никуда не убежишь
+                                        cases = emptyList(),
                                         isElevator = true,
                                     )
                                 } else {
                                     val casesInLeftNeighbourPosition = if (previousCase.isElevator) {
-                                        // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
                                         existingElevatorCasesByPosition[previousCase.position]!!
                                     } else {
-                                        // предыдущая позиция - не лифт и текущая - не лифт
-                                        // на предыдущей позиции могли быть кейсы на построение нового лифта
-                                        // или бег влево к существующему лифту
-                                        // и надо понять, стоит ли в текущей позиции бежать влево ради этих кейсов
-
                                         newElevatorCasesByPosition[previousCase.position]!!
                                     } + previousCase.cases
-
-                                    // здесь нужно взять все варианты требуемых ресурсов с предыдущего шага
-                                    // и добавить раунды в зависимости от направления
 
                                     HorizontalRunCase(
                                         position = currentPosition,
@@ -792,30 +630,23 @@ private data class Area(
                                             }
                                             .flatMap { caseFromLeftNeighbourPosition ->
                                                 listOf(
-                                                    // просто бежим налево к предыдущим кейсам
                                                     caseFromLeftNeighbourPosition.copy(
                                                         point = floorPointAt(currentPosition),
                                                         direction = Direction.LEFT,
                                                         action = CloneAction.KEEP_GOING,
-                                                        // движение к предыдущему кейсу
                                                         constraints = caseFromLeftNeighbourPosition.constraints.copy(
                                                             roundsLeft = caseFromLeftNeighbourPosition.constraints.roundsLeft + 1,
                                                         ),
-                                                        idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromLeftNeighbourPosition,
                                                     ),
-                                                    // разворачиваемся и бежим налево к предыдущим кейсам
-
                                                     caseFromLeftNeighbourPosition.copy(
                                                         point = floorPointAt(currentPosition),
                                                         direction = Direction.RIGHT,
                                                         action = CloneAction.BLOCK_CLONE,
-                                                        // блок и движение к предыдущему кейсу
                                                         constraints = caseFromLeftNeighbourPosition.constraints.copy(
                                                             clonesLeft = caseFromLeftNeighbourPosition.constraints.clonesLeft + 1,
                                                             roundsLeft = caseFromLeftNeighbourPosition.constraints.roundsLeft + 1 + config.cloneCostInRounds,
                                                         ),
-                                                        idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromLeftNeighbourPosition,
                                                     ),
                                                 )
@@ -832,12 +663,11 @@ private data class Area(
                                     )
                                 }
 
-                            // вариант 4: бежать направо к ближнему лифту или к лучшей возможной точке построения нового лифта
                             val rightMostPosition = width - 1
                             generateSequence(
                                 HorizontalRunCase(
                                     position = rightMostPosition,
-                                    cases = emptyList(), // с правой позиции бесполезно бежать вправо
+                                    cases = emptyList(),
                                     isElevator = config
                                         .elevators
                                         .isElevator(
@@ -863,19 +693,13 @@ private data class Area(
                                 if (isElevator) {
                                     HorizontalRunCase(
                                         position = currentPosition,
-                                        cases = emptyList(), // из лифта направо не убежишь - никуда не убежишь
+                                        cases = emptyList(),
                                         isElevator = true,
                                     )
                                 } else {
                                     val casesInRightNeighbourPosition = if (previousCase.isElevator) {
-                                        // ранее для всех лифтов заполнили existingElevatorCasesByPosition (вариант 1)
                                         existingElevatorCasesByPosition[previousCase.position]!!
                                     } else {
-                                        // предыдущая позиция - не лифт и текущая - не лифт
-                                        // на предыдущей позиции могли быть кейсы на построение нового лифта
-                                        // или бег вправо к существующему лифту
-                                        // и надо понять, стоит ли в текущей позиции бежать вправо ради этих кейсов
-
                                         newElevatorCasesByPosition[previousCase.position]!!
                                     } + previousCase.cases
 
@@ -894,7 +718,6 @@ private data class Area(
                                                         constraints = caseFromRightNeighbourPosition.constraints.copy(
                                                             roundsLeft = caseFromRightNeighbourPosition.constraints.roundsLeft + 1,
                                                         ),
-                                                        idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromRightNeighbourPosition,
                                                     ),
                                                     caseFromRightNeighbourPosition.copy(
@@ -905,7 +728,6 @@ private data class Area(
                                                             clonesLeft = caseFromRightNeighbourPosition.constraints.clonesLeft + 1,
                                                             roundsLeft = caseFromRightNeighbourPosition.constraints.roundsLeft + 1 + config.cloneCostInRounds,
                                                         ),
-                                                        idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromRightNeighbourPosition,
                                                     ),
                                                 )
