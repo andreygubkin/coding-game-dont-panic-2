@@ -171,21 +171,6 @@ private enum class Direction {
 }
 
 /**
- * Описание идеи, стоящей за кейсом
- */
-private enum class CaseIdea(
-    val code: String,
-) {
-    JUST_RUN_TO_EXIT("JREx"),
-    REVERSE_AND_RUN_TO_EXIT("RREx"),
-    EXIT("Ex"),
-    USE_EXISTING_ELEVATOR("El"),
-    BUILD_NEW_ELEVATOR("BEl"),
-    RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RTEl"),
-    REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE("RRTEl"),
-}
-
-/**
  * Действие клона на раунде
  */
 private enum class CloneAction {
@@ -217,10 +202,6 @@ private data class Case(
      * Для какого текущего направления клона этот кейс
      */
     val direction: Direction,
-    /**
-     * Идея кейса
-     */
-    val idea: CaseIdea,
     /**
      * Кейс, к которому бежим
      */
@@ -542,7 +523,7 @@ private data class Area(
                             newCases = listOf(
                                 Case(
                                     point = floorPointAt(config.exitPosition),
-                                    idea = CaseIdea.EXIT,
+                                    //idea = CaseIdea.EXIT,
                                     direction = Direction.LEFT,
                                     action = CloneAction.KEEP_GOING,
                                     constraints = StateConstraints(
@@ -553,7 +534,7 @@ private data class Area(
                                 ),
                                 Case(
                                     point = floorPointAt(config.exitPosition),
-                                    idea = CaseIdea.EXIT,
+                                    //idea = CaseIdea.EXIT,
                                     direction = Direction.RIGHT,
                                     action = CloneAction.KEEP_GOING,
                                     constraints = StateConstraints(
@@ -578,7 +559,7 @@ private data class Area(
                                     newCases = listOf(
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
+                                            //idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
                                             direction = Direction.LEFT,
                                             action = CloneAction.BLOCK_CLONE,
                                             constraints = StateConstraints(
@@ -591,7 +572,7 @@ private data class Area(
                                         // пробежать расстояние до выхода без расходования клонов
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.JUST_RUN_TO_EXIT,
+                                            //idea = CaseIdea.JUST_RUN_TO_EXIT,
                                             direction = Direction.RIGHT,
                                             action = CloneAction.KEEP_GOING,
                                             constraints = StateConstraints(
@@ -617,7 +598,7 @@ private data class Area(
                                     newCases = listOf(
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
+                                            //idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
                                             direction = Direction.RIGHT,
                                             action = CloneAction.BLOCK_CLONE,
                                             constraints = StateConstraints(
@@ -630,7 +611,7 @@ private data class Area(
                                         // пробежать расстояние до выхода без расходования клонов
                                         Case(
                                             point = floorPointAt(position),
-                                            idea = CaseIdea.JUST_RUN_TO_EXIT,
+                                            //idea = CaseIdea.JUST_RUN_TO_EXIT,
                                             direction = Direction.LEFT,
                                             action = CloneAction.KEEP_GOING,
                                             constraints = StateConstraints(
@@ -691,7 +672,7 @@ private data class Area(
                                                             roundsLeft = upperFloorCase.constraints.roundsLeft + 1,
                                                         ),
                                                         action = CloneAction.KEEP_GOING,
-                                                        idea = CaseIdea.USE_EXISTING_ELEVATOR,
+                                                        //idea = CaseIdea.USE_EXISTING_ELEVATOR,
                                                         targetCase = upperFloorCase,
                                                     )
                                                 }
@@ -715,7 +696,7 @@ private data class Area(
                                                             clonesLeft = upperFloorCase.constraints.clonesLeft + 1,
                                                             roundsLeft = upperFloorCase.constraints.roundsLeft + 1 + config.cloneCostInRounds,
                                                         ),
-                                                        idea = CaseIdea.BUILD_NEW_ELEVATOR,
+                                                        //idea = CaseIdea.BUILD_NEW_ELEVATOR,
                                                         targetCase = upperFloorCase,
                                                     )
                                                 }
@@ -800,7 +781,7 @@ private data class Area(
                                                         constraints = caseFromLeftNeighbourPosition.constraints.copy(
                                                             roundsLeft = caseFromLeftNeighbourPosition.constraints.roundsLeft + 1,
                                                         ),
-                                                        idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
+                                                        //idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromLeftNeighbourPosition,
                                                     ),
                                                     // разворачиваемся и бежим налево к предыдущим кейсам
@@ -814,7 +795,7 @@ private data class Area(
                                                             clonesLeft = caseFromLeftNeighbourPosition.constraints.clonesLeft + 1,
                                                             roundsLeft = caseFromLeftNeighbourPosition.constraints.roundsLeft + 1 + config.cloneCostInRounds,
                                                         ),
-                                                        idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
+                                                        //idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromLeftNeighbourPosition,
                                                     ),
                                                 )
@@ -893,7 +874,7 @@ private data class Area(
                                                         constraints = caseFromRightNeighbourPosition.constraints.copy(
                                                             roundsLeft = caseFromRightNeighbourPosition.constraints.roundsLeft + 1,
                                                         ),
-                                                        idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
+                                                        //idea = CaseIdea.RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromRightNeighbourPosition,
                                                     ),
                                                     caseFromRightNeighbourPosition.copy(
@@ -904,7 +885,7 @@ private data class Area(
                                                             clonesLeft = caseFromRightNeighbourPosition.constraints.clonesLeft + 1,
                                                             roundsLeft = caseFromRightNeighbourPosition.constraints.roundsLeft + 1 + config.cloneCostInRounds,
                                                         ),
-                                                        idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
+                                                        //idea = CaseIdea.REVERSE_AND_RUN_UNTIL_POSSIBILITY_TO_ELEVATE,
                                                         targetCase = caseFromRightNeighbourPosition,
                                                     ),
                                                 )
