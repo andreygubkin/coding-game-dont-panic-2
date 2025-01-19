@@ -2,9 +2,14 @@ import Case.Companion.optimize
 import java.util.*
 
 fun main() {
+    //val input = LoggingScanner(Scanner(System.`in`))
+    val input = SimpleScanner(Scanner(System.`in`))
+    runGame(input)
+}
 
-    val input = Scanner(System.`in`)
-
+fun runGame(
+    input: IInputSource,
+) {
     val config = GameConfig
         .readFromStdIn(
             input = input,
@@ -37,7 +42,11 @@ fun main() {
         finishRound(Command.KEEP_GOING)
     }
 
+    var gameOver = false
+
     fun useExit(): Nothing {
+        gameOver = true
+        debug(input.description)
         finishRound(Command.USE_EXIT)
     }
 
@@ -74,7 +83,7 @@ fun main() {
         finishRound(Command.BUILD_ELEVATOR)
     }
 
-    while (true) {
+    while (!gameOver) {
         try {
             val clone = AreaPoint(
                 floor = input.nextInt(), // floor of the leading clone
@@ -378,7 +387,7 @@ private data class GameConfig(
 
     companion object {
         fun readFromStdIn(
-            input: Scanner,
+            input: IInputSource,
         ): GameConfig {
             val floorsNumber = input.nextInt()
             return GameConfig(
@@ -418,7 +427,7 @@ private class Elevators {
 
     companion object {
         fun readFromStdIn(
-            input: Scanner,
+            input: IInputSource,
         ): Elevators {
             return Elevators()
                 .apply {
@@ -906,5 +915,88 @@ private data class Area(
                     .reversed()
             )
         }
+    }
+}
+
+private fun debug(@Suppress("UNUSED_PARAMETER") s: String) {
+    //System.err.println(s)
+}
+
+interface IInputSource {
+    val description: String
+
+    fun nextInt(): Int
+    fun next(): String
+}
+
+@Suppress("unused")
+class SimpleScanner(
+    private val scanner: Scanner,
+): IInputSource {
+    override val description: String
+        get() {
+            return "simple stdin scanner"
+        }
+
+    override fun nextInt(): Int {
+        return scanner.nextInt()
+    }
+
+    override fun next(): String {
+        return scanner.next()
+    }
+}
+
+@Suppress("unused")
+class LoggingScanner(
+    private val scanner: Scanner,
+): IInputSource {
+    override val description: String
+        get() {
+            return "Collected inputs: ${inputs.joinToString()}"
+        }
+
+    override fun nextInt(): Int {
+        return scanner.nextInt().also {
+            log(it)
+        }
+    }
+
+    override fun next(): String {
+        return scanner.next().also {
+            log(it)
+        }
+    }
+
+    private val inputs = mutableListOf<String>()
+
+    private fun log(
+        value: Any,
+    ) {
+        inputs += value.toString()
+    }
+}
+
+class PlayerInput(
+    private val inputs: List<String>,
+): IInputSource {
+
+    private var currentInputIndex = 0
+
+    private fun nextInput(): String {
+        return inputs[currentInputIndex++]
+    }
+
+    override val description: String
+        get() {
+            return "Playing inputs: ${inputs.joinToString(separator = ", ")}"
+        }
+
+    override fun nextInt(): Int {
+        return nextInput().toInt()
+    }
+
+    override fun next(): String {
+        return nextInput()
     }
 }
