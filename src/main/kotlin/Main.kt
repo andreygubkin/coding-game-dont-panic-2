@@ -107,7 +107,6 @@ fun main() {
                 useElevator()
             }
 
-            //debugger.debug("Position cases:")
             val bestCase = area
                 .getCasesFor(
                     point = clone,
