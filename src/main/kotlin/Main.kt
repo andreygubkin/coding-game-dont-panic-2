@@ -5,10 +5,6 @@ import java.util.*
 import kotlin.collections.LinkedHashSet
 
 fun main() {
-
-    // TODO: в Best Path надо сначала направо бежать
-    // а не разворачиваться!
-
     startedAt = Instant.now()
     lastMeasuredAt = startedAt
 
@@ -18,12 +14,6 @@ fun main() {
         .readFromStdIn(
             input = input,
         )
-        .let {
-            it.copy(
-                //roundsNumber = it.roundsNumber + 1,
-                //roundsNumber = 14,
-            )
-        }
 
     //debug("config: $config")
 
@@ -42,7 +32,6 @@ fun main() {
 
     @Suppress("unused")
     fun debugArea() {
-        return
         debug("Area:")
         area
             .floors
@@ -58,9 +47,9 @@ fun main() {
                 floor
                     .toString()
                     .lines()
-                    .also {
-                        debug(it.first())
-                        it
+                    .also { lines ->
+                        debug(lines.first())
+                        lines
                             .slice(
                                 indices = headerLinesCount + fromPosition
                                         ..headerLinesCount + toPosition
@@ -73,16 +62,12 @@ fun main() {
             }
     }
 
-    debugArea()
+    //debugArea()
 
     // перенести внутрь Area
     val newElevators = hashSetOf<AreaPoint>()
 
     val path = Path()
-
-    fun debugPath() {
-        //debug(path)
-    }
 
     fun finishRound(
         command: Command,
@@ -113,10 +98,9 @@ fun main() {
     fun blockClone(): Nothing {
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
-            roundsLeft = resources.roundsLeft - 1,
+            // trade-off: расходуем клона ради ускорения по раундам
+            roundsLeft = resources.roundsLeft + 1,
         )
-        area.decrementRequiredClones(path)
-        area.decrementRequiredRounds(path)
 
         finishRound(Command.BLOCK_CLONE)
     }
@@ -127,21 +111,16 @@ fun main() {
         resources = resources.copy(
             clonesLeft = resources.clonesLeft - 1,
             elevatorsLeft = resources.elevatorsLeft - 1,
-            roundsLeft = resources.roundsLeft - 1,
+            // trade-off: расходуем клона ради ускорения по раундам
+            roundsLeft = resources.roundsLeft + 1,
         )
-        area.decrementRequiredElevators(path)
-        area.decrementRequiredClones(path)
-        area.decrementRequiredRounds(path)
 
         newElevators += elevator
         finishRound(Command.BUILD_ELEVATOR)
     }
 
-    // game loop
     while (true) {
         try {
-            debug("round started")
-
             val clone = AreaPoint(
                 floor = input.nextInt(), // floor of the leading clone
                 position = input.nextInt(), // position of the leading clone on its floor
@@ -164,6 +143,7 @@ fun main() {
             }
 
             path += clone
+            //debugPath()
 
             // выходим
             if (area.isExit(clone)) {
@@ -177,54 +157,30 @@ fun main() {
                 useElevator()
             }
 
-            debug("Position cases:")
+            //debug("Position cases:")
             val bestCase = area
                 .getCasesFor(clone)
-                .map { case ->
-                    if (case.action.direction == direction) {
-                        case
-                    } else {
-                        case.copy(
-                            constraints = case.constraints.copy(
-                                clonesLeft = case.constraints.clonesLeft + 1,
-                                roundsLeft = case.constraints.roundsLeft + config.cloneCostInRounds,
-                            ),
-                        )
-                    }
+                .filter {  case ->
+                    case.direction == direction
                 }
                 .filter { case ->
                     resources
                         .isEnoughFor(
                             constraints = case.constraints,
                         )
-                        .also { satisfies ->
+                        /*.also { satisfies ->
                             debug("\t$case ${if (satisfies) "+" else "-"}")
-                        }
+                        }*/
                 }
                 .minByOrNull {
                     it.constraints.roundsLeft
                 }
 
-            //TODO: на карте ресурсы посчитаны для первого клона
-            // следующие бегут в уже изменившихся условиях, и надо пересчитать ресурсы
-            // построенные лифты могут быть посчитаны как новые лифты и карта пересчитана
-            // как учесть поставленные блоки?
-            // как только второй клон добегает до ячейки после блока, ему уже не хватает ресурсов, так как прошло 3 раунда
-            // и один клон потрачен, хотя первому клону ресурсов хватало, чтобы зайти на эту ячейку и поставить блок
-
-            // решение - сразу вычислить путь
-            // и команды делать в зависимости от положения на пути
-
-            // или если клон пока на уже проложенном пути, то ничего не делать
-            // и можно не пересчитывать веса
-
             requireNotNull(bestCase) {
                 "no suitable case found"
             }
 
-            debug("bestCase: $bestCase")
-
-            debugPath()
+            //debug("bestCase: $bestCase")
 
             if (bestCase.action.buildElevator) {
                 buildElevator(
@@ -232,8 +188,7 @@ fun main() {
                 )
             }
 
-            if (bestCase.action.direction != direction) {
-                // клон двигается в другом направлении, надо развернуть
+            if (bestCase.action.blockClone) {
                 blockClone()
             }
 
@@ -241,8 +196,8 @@ fun main() {
             keepGoing()
 
         } catch (e: FinishRoundException) {
-            debug("round end ${e.command}")
-            debugArea()
+            //debug("round end ${e.command}")
+            //debugArea()
             println(e.command.message)
         } catch (e: Throwable) {
             debug("exception ${e.stackTraceToString()}")
@@ -253,7 +208,7 @@ fun main() {
 
 private lateinit var startedAt: Instant
 private lateinit var lastMeasuredAt: Instant
-private const val DEBUG_MODE = true
+private const val DEBUG_MODE = false
 private const val DEBUG_OUTPUT_TIME = false
 
 @Suppress("unused")
@@ -312,14 +267,20 @@ private enum class CaseIdea(
 
 private data class CaseAction(
     /**
-     * Направление клона
-     */
-    val direction: Direction,
-    /**
      * Предполагает обязательную постройку лифта
      */
     val buildElevator: Boolean,
-)
+    /**
+     * Предполагает обязательную блокировку клона
+     */
+    val blockClone: Boolean,
+) {
+    init {
+        require(!(buildElevator && blockClone)) {
+            "can't block and build elevator simultaneously"
+        }
+    }
+}
 
 /**
  * Вариант дальнейшего движения - с указанием расстояния и требуемых ресурсов
@@ -329,6 +290,10 @@ private data class Case(
      * Позиция в зоне, для которой вычислен данный кейс
      */
     val point: AreaPoint,
+    /**
+     * Для какого текущего направления клона этот кейс
+     */
+    val direction: Direction,
     /**
      * Идея кейса
      */
@@ -348,19 +313,13 @@ private data class Case(
 ) {
     override fun toString(): String {
         return "${idea.code}:" +
-                (if (action.direction == Direction.LEFT) "<-" else "->") +
+                (if (direction == Direction.LEFT) "<-" else "->") +
                 (if (action.buildElevator) "^" else "") +
                 "$constraints" +
                 (targetCase
                     ?.let {
                         "[${it.copy(targetCase = null).description()}]"
-                    } ?: "") +
-                (additionalActions
-                    .takeIf {
-                        it.isNotEmpty()
-                    }
-                    ?.joinToString(prefix = "{", postfix = "}", separator = ",")
-                    ?: "")
+                    } ?: "")
     }
 
     fun description(): String {
@@ -376,29 +335,6 @@ private data class Case(
             }
     }
 
-    private val additionalActions = mutableListOf<String>()
-
-    fun decrementRequiredRounds() {
-        constraints = constraints.copy(
-            roundsLeft = constraints.roundsLeft - 1,
-        )
-        additionalActions += "r-"
-    }
-
-    fun decrementRequiredClones() {
-        constraints = constraints.copy(
-            clonesLeft = constraints.clonesLeft - 1,
-        )
-        additionalActions += "c-"
-    }
-
-    fun decrementRequiredElevators() {
-        constraints = constraints.copy(
-            elevatorsLeft = constraints.elevatorsLeft - 1,
-        )
-        additionalActions += "e-"
-    }
-
     companion object {
         /**
          * Отбросить варианты с более жёсткими ограничениями,
@@ -407,7 +343,7 @@ private data class Case(
         fun List<Case>.optimize(): List<Case> {
             return this
                 .groupBy {
-                    it.action.direction
+                    it.direction
                 }
                 .flatMap { entry ->
                     entry
@@ -497,39 +433,39 @@ private data class StateConstraints(
 
 private data class GameConfig(
     /**
-     * number of floors in the area. A clone can move between floor 0 and floor floorsNumber - 1
+     * Number of floors in the area. A clone can move between floor 0 and floor floorsNumber - 1
      */
     val floorsNumber: Int,
     /**
-     * the width of the area. The clone can move without being destroyed between position 0 and position width - 1
+     * The width of the area. The clone can move without being destroyed between position 0 and position width - 1
      */
     val width: Int,
     /**
-     * maximum number of rounds before the end of the game
+     * Maximum number of rounds before the end of the game
      */
     val roundsNumber: Int,
     /**
-     * the floor on which the exit is located
+     * The floor on which the exit is located
      */
     val exitFloor: Int,
     /**
-     * the position of the exit on its floor
+     * The position of the exit on its floor
      */
     val exitPosition: Int,
     /**
-     * the number of clones that will come out of the generator during the game
+     * The number of clones that will come out of the generator during the game
      */
     val totalClonesNumber: Int,
     /**
-     * number of additional elevators that you can build
+     * Number of additional elevators that you can build
      */
     val additionalElevatorsNumber: Int,
     /**
-     * elevators in the area
+     * Elevators in the area
      */
     val elevators: Elevators,
     /**
-     * период выпуска новых клонов
+     * Период выпуска новых клонов
      */
     val clonesEmissionPeriod: Int,
 ) {
@@ -667,31 +603,6 @@ private class Floor(
         )
     }
 
-    fun withChangedCases(
-        block: (List<Case>) -> List<Case>,
-    ): Floor {
-        val originalFloor = this
-
-        val newFloor = Floor(
-            floorIndex = floorIndex,
-            width = width,
-        )
-
-        return newFloor
-            .apply {
-                originalFloor
-                    .floorCases
-                    .withIndex()
-                    .forEach {
-                        newFloor
-                            .addCases(
-                                position = it.index,
-                                newCases = block(it.value),
-                            )
-                    }
-            }
-    }
-
     private var floorCases: List<MutableList<Case>> = List(size = width) {
         mutableListOf()
     }
@@ -730,49 +641,8 @@ private data class Area(
     val elevators: Elevators,
     val floors: List<Floor>,
 ) {
-    private fun Path.process(
-        block: (Case) -> Unit,
-    ) {
-        val cases = getCasesFor(this)
-        cases.forEach(block)
-    }
-
-    fun decrementRequiredRounds(
-        path: Path,
-    ) {
-        path.process { case ->
-            case.decrementRequiredRounds()
-        }
-    }
-
-    fun decrementRequiredClones(
-        path: Path,
-    ) {
-        path.process { case ->
-            case.decrementRequiredClones()
-        }
-    }
-
-    fun decrementRequiredElevators(
-        path: Path,
-    ) {
-        path.process { case ->
-            case.decrementRequiredElevators()
-        }
-    }
-
     override fun toString(): String {
         return "Area:\n${floors.reversed().joinToString("\n")}"
-    }
-
-    fun getCasesFor(
-        path: Path,
-    ): List<Case> {
-        return path
-            .points
-            .flatMap {
-                getCasesFor(it)
-            }
     }
 
     fun getCasesFor(
@@ -825,8 +695,9 @@ private data class Area(
                                 Case(
                                     point = floorPointAt(config.exitPosition),
                                     idea = CaseIdea.EXIT,
+                                    direction = Direction.LEFT,
                                     action = CaseAction(
-                                        direction = Direction.LEFT,
+                                        blockClone = false,
                                         buildElevator = false,
                                     ),
                                     constraints = StateConstraints(
@@ -838,8 +709,9 @@ private data class Area(
                                 Case(
                                     point = floorPointAt(config.exitPosition),
                                     idea = CaseIdea.EXIT,
+                                    direction = Direction.RIGHT,
                                     action = CaseAction(
-                                        direction = Direction.RIGHT,
+                                        blockClone = false,
                                         buildElevator = false,
                                     ),
                                     constraints = StateConstraints(
@@ -865,8 +737,9 @@ private data class Area(
                                         Case(
                                             point = floorPointAt(position),
                                             idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
+                                            direction = Direction.LEFT,
                                             action = CaseAction(
-                                                direction = Direction.LEFT,
+                                                blockClone = true,
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
@@ -880,8 +753,9 @@ private data class Area(
                                         Case(
                                             point = floorPointAt(position),
                                             idea = CaseIdea.JUST_RUN_TO_EXIT,
+                                            direction = Direction.RIGHT,
                                             action = CaseAction(
-                                                direction = Direction.RIGHT,
+                                                blockClone = false,
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
@@ -908,8 +782,9 @@ private data class Area(
                                         Case(
                                             point = floorPointAt(position),
                                             idea = CaseIdea.REVERSE_AND_RUN_TO_EXIT,
+                                            direction = Direction.RIGHT,
                                             action = CaseAction(
-                                                direction = Direction.RIGHT,
+                                                blockClone = true,
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
@@ -923,8 +798,9 @@ private data class Area(
                                         Case(
                                             point = floorPointAt(position),
                                             idea = CaseIdea.JUST_RUN_TO_EXIT,
+                                            direction = Direction.LEFT,
                                             action = CaseAction(
-                                                direction = Direction.LEFT,
+                                                blockClone = false,
                                                 buildElevator = false,
                                             ),
                                             constraints = StateConstraints(
@@ -982,7 +858,8 @@ private data class Area(
                                                         constraints = upperFloorCase.constraints.copy(
                                                             roundsLeft = upperFloorCase.constraints.roundsLeft + 1,
                                                         ),
-                                                        action = upperFloorCase.action.copy(
+                                                        action = CaseAction(
+                                                            blockClone = false,
                                                             buildElevator = false,
                                                         ),
                                                         idea = CaseIdea.USE_EXISTING_ELEVATOR,
@@ -1002,7 +879,8 @@ private data class Area(
                                                 .map { upperFloorCase ->
                                                     upperFloorCase.copy(
                                                         point = floorPointAt(position),
-                                                        action = upperFloorCase.action.copy(
+                                                        action = CaseAction(
+                                                            blockClone = false,
                                                             buildElevator = true,
                                                         ),
                                                         // построить лифт и подняться на нём
@@ -1079,15 +957,16 @@ private data class Area(
 
                                         cases = casesInLeftNeighbourPosition
                                             .filter {
-                                                it.action.direction == Direction.LEFT
+                                                it.direction == Direction.LEFT
                                             }
                                             .flatMap { caseFromLeftNeighbourPosition ->
                                                 listOf(
                                                     // просто бежим налево к предыдущим кейсам
                                                     caseFromLeftNeighbourPosition.copy(
                                                         point = floorPointAt(currentPosition),
+                                                        direction = Direction.LEFT,
                                                         action = CaseAction(
-                                                            direction = Direction.LEFT,
+                                                            blockClone = false,
                                                             buildElevator = false,
                                                         ),
                                                         // движение к предыдущему кейсу
@@ -1099,13 +978,11 @@ private data class Area(
                                                     ),
                                                     // разворачиваемся и бежим налево к предыдущим кейсам
 
-                                                    // TODO: если бегу вправо, то нельзя просто брать лучший кейс влево
-                                                    // к этому кейсу надо прибавить +1 клон и +3 раунда!!!!
-
                                                     caseFromLeftNeighbourPosition.copy(
                                                         point = floorPointAt(currentPosition),
+                                                        direction = Direction.RIGHT,
                                                         action = CaseAction(
-                                                            direction = Direction.RIGHT,
+                                                            blockClone = true,
                                                             buildElevator = false,
                                                         ),
                                                         // блок и движение к предыдущему кейсу
@@ -1177,14 +1054,15 @@ private data class Area(
                                         position = currentPosition,
                                         cases = casesInRightNeighbourPosition
                                             .filter {
-                                                it.action.direction == Direction.RIGHT
+                                                it.direction == Direction.RIGHT
                                             }
                                             .flatMap { caseFromRightNeighbourPosition ->
                                                 listOf(
                                                     caseFromRightNeighbourPosition.copy(
                                                         point = floorPointAt(currentPosition),
+                                                        direction = Direction.RIGHT,
                                                         action = CaseAction(
-                                                            direction = Direction.RIGHT,
+                                                            blockClone = false,
                                                             buildElevator = false,
                                                         ),
                                                         constraints = caseFromRightNeighbourPosition.constraints.copy(
@@ -1195,8 +1073,9 @@ private data class Area(
                                                     ),
                                                     caseFromRightNeighbourPosition.copy(
                                                         point = floorPointAt(currentPosition),
+                                                        direction = Direction.LEFT,
                                                         action = CaseAction(
-                                                            direction = Direction.LEFT,
+                                                            blockClone = true,
                                                             buildElevator = false,
                                                         ),
                                                         constraints = caseFromRightNeighbourPosition.constraints.copy(
@@ -1224,15 +1103,6 @@ private data class Area(
                         }
                 }
                     .take(config.workFloorsNumber)
-                    .map { floor ->
-                        floor.withChangedCases { cases ->
-                            cases.filter {
-                                true
-                                // TODO: убрать
-                                it.constraints.elevatorsLeft == 0
-                            }
-                        }
-                    }
                     .toList()
                     .reversed()
             )
