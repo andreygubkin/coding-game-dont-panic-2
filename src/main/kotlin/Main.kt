@@ -1,12 +1,7 @@
 import Case.Companion.optimize
-import java.time.Duration
-import java.time.Instant
 import java.util.*
-import kotlin.collections.LinkedHashSet
 
 fun main() {
-
-    val debugger = Debugger()
 
     val input = Scanner(System.`in`)
 
@@ -15,20 +10,14 @@ fun main() {
             input = input,
         )
 
-    //debugger.debug("config: $config")
-
     var resources = config.getInitialResource()
-
-    //debugger.debug("resources = $resources")
 
     val area = Area
         .buildArea(
             config = config,
         )
 
-    //debugger.debugArea()
-
-    val path = Path()
+    val path = hashSetOf<AreaPoint>()
 
     fun finishRound(
         command: Command,
@@ -92,11 +81,7 @@ fun main() {
                 position = input.nextInt(), // position of the leading clone on its floor
             )
 
-            // direction of the leading clone: LEFT or RIGHT (or NONE)
             val direction = Direction.valueOf(input.next())
-
-            //debugger.debug("clone = $clone, $direction")
-            //debugger.debug("resources = $resources")
 
             fun noClone() = clone.position < 0
 
@@ -133,9 +118,6 @@ fun main() {
                         .isEnoughFor(
                             constraints = case.constraints,
                         )
-                    /*.also { satisfies ->
-                        debugger.debug("\t$case ${if (satisfies) "+" else "-"}")
-                    }*/
                 }
                 .minByOrNull {
                     it.constraints.roundsLeft
@@ -144,8 +126,6 @@ fun main() {
             requireNotNull(bestCase) {
                 "No suitable case found"
             }
-
-            //debugger.debug("bestCase: $bestCase")
 
             when (bestCase.action) {
                 CloneAction.KEEP_GOING -> {
@@ -164,9 +144,6 @@ fun main() {
             }
         } catch (e: FinishRoundException) {
             println(e.command.message)
-        } catch (e: Throwable) {
-            debugger.debug("exception ${e.stackTraceToString()}")
-            throw e
         }
     }
 }
@@ -258,36 +235,6 @@ private data class Case(
      */
     var constraints: StateConstraints,
 ) {
-    override fun toString(): String {
-
-        val stringParts = sequence {
-            yield("${idea.code}:")
-            yield(
-                value = if (direction == Direction.LEFT) "<-" else "->",
-            )
-            yield(
-                value = when (action) {
-                    CloneAction.BUILD_ELEVATOR -> "^"
-                    CloneAction.BLOCK_CLONE -> "*"
-                    CloneAction.KEEP_GOING -> ""
-                },
-            )
-            yield("$constraints")
-            yield(
-                value = targetCase
-                    ?.let {
-                        "[${it.copy(targetCase = null).description()}]"
-                    } ?: "",
-            )
-        }
-
-        return stringParts.joinToString(separator = "")
-    }
-
-    fun description(): String {
-        return "$point:$this"
-    }
-
     private fun hasLessStrictAnalogueAmong(
         cases: List<Case>,
     ): Boolean {
@@ -387,10 +334,6 @@ private data class StateConstraints(
             else -> false
         }
     }
-
-    override fun toString(): String {
-        return "r${roundsLeft}e${elevatorsLeft}c$clonesLeft"
-    }
 }
 
 private data class GameConfig(
@@ -449,22 +392,6 @@ private data class GameConfig(
      */
     val workFloorsNumber = exitFloor + 1
 
-    override fun toString(): String {
-        return """GameConfig(
-            |   floorsNumber: $floorsNumber,
-            |   width: $width,
-            |   roundsNumber: $roundsNumber,
-            |   exitFloor: $exitFloor,
-            |   exitPosition: $exitPosition,
-            |   totalClonesNumber: $totalClonesNumber,
-            |   additionalElevatorsNumber: $additionalElevatorsNumber,
-            |   elevators: $elevators,
-            |   clonesEmissionPeriod: $clonesEmissionPeriod,
-            |   cloneCostInRounds: $cloneCostInRounds,
-            |   workFloorsNumber: $workFloorsNumber,
-            |)""".trimMargin()
-    }
-
     fun getInitialResource(): StateConstraints {
         return StateConstraints(
             clonesLeft = totalClonesNumber,
@@ -513,23 +440,6 @@ private class Elevators {
         return point in elevators
     }
 
-    override fun toString(): String {
-        return elevators
-            .groupBy {
-                it.floor
-            }
-            .mapValues {
-                it.value.map { it.position }.sorted()
-            }
-            .toList()
-            .sortedBy {
-                it.first
-            }
-            .joinToString(separator = "; ") {
-                "${it.first}:${it.second}"
-            }
-    }
-
     companion object {
         fun readFromStdIn(
             input: Scanner,
@@ -557,11 +467,7 @@ private class Elevators {
 private data class AreaPoint(
     val floor: Int,
     val position: Int,
-) {
-    override fun toString(): String {
-        return "$floor/$position"
-    }
-}
+)
 
 private class Floor(
     val floorIndex: Int,
@@ -597,16 +503,6 @@ private class Floor(
     ) {
         floorCases[position] += newCases
     }
-
-    override fun toString(): String {
-        return "Floor #$floorIndex:\n${
-            cases
-                .withIndex()
-                .joinToString("\n") {
-                    "\t${it.index}: ${it.value.joinToString(", ")}"
-                }
-        }"
-    }
 }
 
 private data class Area(
@@ -614,10 +510,6 @@ private data class Area(
     val elevators: Elevators,
     val floors: List<Floor>,
 ) {
-    override fun toString(): String {
-        return "Area:\n${floors.reversed().joinToString("\n")}"
-    }
-
     fun getCasesFor(
         point: AreaPoint,
         direction: Direction,
@@ -1038,88 +930,5 @@ private data class Area(
                     .reversed()
             )
         }
-    }
-}
-
-private class Path {
-    val points = LinkedHashSet<AreaPoint>()
-
-    override fun toString(): String {
-        return points.joinToString(prefix = "Path: ", separator = " -> ")
-    }
-
-    operator fun plusAssign(
-        point: AreaPoint,
-    ) {
-        points += point
-    }
-
-    operator fun contains(
-        point: AreaPoint,
-    ): Boolean {
-        return point in points
-    }
-}
-
-private class Debugger {
-    private var startedAt: Instant = Instant.now()
-    private var lastMeasuredAt: Instant = startedAt
-
-    @Suppress("unused")
-    fun debugArea(
-        area: Area,
-    ) {
-        debug("Area:")
-        area
-            .floors
-            .filter {
-                it.floorIndex in 0..0
-                //true
-            }
-            .reversed()
-            .forEach { floor ->
-                val headerLinesCount = 1
-                val fromPosition = 0
-                val toPosition = 7
-                floor
-                    .toString()
-                    .lines()
-                    .also { lines ->
-                        debug(lines.first())
-                        lines
-                            .slice(
-                                indices = headerLinesCount + fromPosition
-                                        ..headerLinesCount + toPosition
-                            )
-                            .forEach {
-                                debug(it)
-                            }
-                    }
-                //debug(floor)
-            }
-    }
-
-    @Suppress("unused")
-    fun debug(
-        message: Any,
-    ) {
-        if (!DEBUG_MODE) {
-            return
-        }
-        val debugOutput = if (!DEBUG_OUTPUT_TIME) {
-            message
-        } else {
-            val now = Instant.now()
-            val elapsedTimeMs = Duration.between(startedAt, now).toMillis()
-            val elapsedTimeSinceLastMeasureMs = Duration.between(lastMeasuredAt, now).toMillis()
-            lastMeasuredAt = now
-            "$elapsedTimeMs(+$elapsedTimeSinceLastMeasureMs) ms: $message"
-        }
-        System.err.println(debugOutput)
-    }
-
-    companion object {
-        private const val DEBUG_MODE = false
-        private const val DEBUG_OUTPUT_TIME = false
     }
 }
