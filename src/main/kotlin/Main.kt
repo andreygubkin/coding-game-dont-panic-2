@@ -118,13 +118,9 @@ fun main() {
                             constraints = case.constraints,
                         )
                 }
-                .minByOrNull {
+                .minBy {
                     it.constraints.roundsLeft
                 }
-
-            requireNotNull(bestCase) {
-                "No suitable case found"
-            }
 
             when (bestCase.action) {
                 CloneAction.KEEP_GOING -> {
