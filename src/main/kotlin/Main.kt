@@ -111,11 +111,11 @@ fun main() {
             path += clone
 
             // выходим
-            if (area.isExit(clone)) {
+            if (clone == area.exit) {
                 useExit()
             }
 
-            val isElevator = area.isElevator(clone)
+            val isElevator = area.elevators.isElevator(clone)
 
             // ждём подъёма на лифте
             if (isElevator) {
@@ -126,10 +126,8 @@ fun main() {
             val bestCase = area
                 .getCasesFor(
                     point = clone,
+                    direction = direction,
                 )
-                .filter { case ->
-                    case.direction == direction
-                }
                 .filter { case ->
                     resources
                         .isEnoughFor(
@@ -622,22 +620,14 @@ private data class Area(
 
     fun getCasesFor(
         point: AreaPoint,
+        direction: Direction,
     ): List<Case> {
         return this
             .floors[point.floor]
             .cases[point.position]
-    }
-
-    fun isElevator(
-        point: AreaPoint,
-    ): Boolean {
-        return elevators.isElevator(point)
-    }
-
-    fun isExit(
-        point: AreaPoint,
-    ): Boolean {
-        return point == exit
+            .filter { case ->
+                case.direction == direction
+            }
     }
 
     companion object {
